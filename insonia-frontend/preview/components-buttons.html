@@ -1,0 +1,21 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .btn { font-family: var(--ins-font-sans); font-size: 14px; font-weight: 500; border-radius: var(--ins-radius-md); padding: 0 18px; height: 44px; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 120ms var(--ins-ease); }
+  .primary { background: var(--ins-accent-500); color: #fff; }
+  .primary:hover { background: var(--ins-accent-600); }
+  .secondary { background: var(--ins-surface); color: var(--ins-fg); border-color: var(--ins-border); }
+  .secondary:hover { background: var(--ins-neutral-100); border-color: var(--ins-border-strong); }
+  .ghost { background: transparent; color: var(--ins-fg); }
+  .ghost:hover { background: var(--ins-neutral-100); }
+  .danger { background: var(--ins-danger-500); color: #fff; }
+  .danger:hover { background: var(--ins-danger-700); }
+  .lbl { width: 100%; font-size: 11px; color: var(--ins-fg-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; margin-top: 8px; }
+</style>
+<div class="lbl" style="margin-top:0">Buttons · 44px touch-friendly</div>
+<div class="row">
+  <button class="btn primary">Registrar venda</button>
+  <button class="btn secondary">Cancelar</button>
+  <button class="btn ghost">Ver detalhes</button>
+  <button class="btn danger">Excluir</button>
+</div>

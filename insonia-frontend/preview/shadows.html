@@ -1,0 +1,14 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  body { background: var(--ins-neutral-100); }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 12px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .box { width: 100%; height: 72px; background: #fff; border-radius: var(--ins-radius-md); }
+  .lbl { font-family: var(--ins-font-mono); font-size: 10px; color: var(--ins-fg-muted); }
+</style>
+<div class="grid">
+  <div class="cell"><div class="box" style="box-shadow:var(--ins-shadow-xs)"></div><div class="lbl">xs · card</div></div>
+  <div class="cell"><div class="box" style="box-shadow:var(--ins-shadow-sm)"></div><div class="lbl">sm · hover</div></div>
+  <div class="cell"><div class="box" style="box-shadow:var(--ins-shadow-md)"></div><div class="lbl">md · popover</div></div>
+  <div class="cell"><div class="box" style="box-shadow:var(--ins-shadow-lg)"></div><div class="lbl">lg · modal</div></div>
+</div>

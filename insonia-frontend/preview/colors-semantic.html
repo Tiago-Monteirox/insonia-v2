@@ -1,0 +1,27 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .item { display: flex; flex-direction: column; gap: 6px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; height: 64px; border-radius: var(--ins-radius-sm); overflow: hidden; border: 1px solid var(--ins-border); }
+  .p { display: flex; align-items: center; justify-content: center; font-family: var(--ins-font-mono); font-size: 10px; font-weight: 600; }
+  .name { font-size: 12px; font-weight: 600; color: var(--ins-fg); }
+  .hex { font-family: var(--ins-font-mono); font-size: 10px; color: var(--ins-fg-muted); }
+</style>
+<div class="grid">
+  <div class="item"><div class="pair">
+    <div class="p" style="background:var(--ins-success-50); color:var(--ins-success-700)">success</div>
+    <div class="p" style="background:var(--ins-success-500); color:#fff">500</div>
+  </div><div class="name">Success</div><div class="hex">#10b981 · pago</div></div>
+  <div class="item"><div class="pair">
+    <div class="p" style="background:var(--ins-warning-50); color:var(--ins-warning-700)">warning</div>
+    <div class="p" style="background:var(--ins-warning-500); color:#fff">500</div>
+  </div><div class="name">Warning</div><div class="hex">#f59e0b · estoque baixo</div></div>
+  <div class="item"><div class="pair">
+    <div class="p" style="background:var(--ins-danger-50); color:var(--ins-danger-700)">danger</div>
+    <div class="p" style="background:var(--ins-danger-500); color:#fff">500</div>
+  </div><div class="name">Danger</div><div class="hex">#ef4444 · excluir</div></div>
+  <div class="item"><div class="pair">
+    <div class="p" style="background:var(--ins-info-50); color:var(--ins-info-700)">info</div>
+    <div class="p" style="background:var(--ins-info-500); color:#fff">500</div>
+  </div><div class="name">Info</div><div class="hex">#3b82f6 · info</div></div>
+</div>

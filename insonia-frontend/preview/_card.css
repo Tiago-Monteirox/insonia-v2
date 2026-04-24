@@ -1,0 +1,5 @@
+@import url('../colors_and_type.css');
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--ins-bg); font-family: var(--ins-font-sans); color: var(--ins-fg); }
+body { padding: 20px; }
+.card { background: var(--ins-surface); border: 1px solid var(--ins-border); border-radius: var(--ins-radius-md); padding: 20px; }

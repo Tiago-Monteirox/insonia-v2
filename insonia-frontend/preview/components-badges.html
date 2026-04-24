@@ -1,0 +1,16 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: var(--ins-radius-full); display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; }
+  .lbl { width: 100%; font-size: 11px; color: var(--ins-fg-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; margin-top: 4px; }
+</style>
+<div class="lbl" style="margin-top:0">Status badges · lowercase</div>
+<div class="row">
+  <span class="badge" style="background:var(--ins-success-50); color:var(--ins-success-700)"><span class="dot" style="background:var(--ins-success-500)"></span>pago</span>
+  <span class="badge" style="background:var(--ins-warning-50); color:var(--ins-warning-700)"><span class="dot" style="background:var(--ins-warning-500)"></span>estoque baixo</span>
+  <span class="badge" style="background:var(--ins-danger-50); color:var(--ins-danger-700)"><span class="dot" style="background:var(--ins-danger-500)"></span>sem estoque</span>
+  <span class="badge" style="background:var(--ins-info-50); color:var(--ins-info-700)"><span class="dot" style="background:var(--ins-info-500)"></span>pendente</span>
+  <span class="badge" style="background:var(--ins-neutral-100); color:var(--ins-neutral-700)">rascunho</span>
+  <span class="badge" style="background:var(--ins-accent-50); color:var(--ins-accent-700)">promoção</span>
+</div>

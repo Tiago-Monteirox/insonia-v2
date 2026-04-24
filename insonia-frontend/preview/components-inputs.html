@@ -1,0 +1,23 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  .stack { display: flex; flex-direction: column; gap: 14px; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .lbl { font-size: 13px; font-weight: 500; color: var(--ins-fg); }
+  .hint { font-size: 12px; color: var(--ins-fg-muted); }
+  .input { height: 44px; border-radius: var(--ins-radius-md); border: 1px solid var(--ins-border); padding: 0 14px; font-family: var(--ins-font-sans); font-size: 14px; color: var(--ins-fg); background: #fff; transition: all 120ms var(--ins-ease); }
+  .input:focus { outline: none; border-color: var(--ins-accent-500); box-shadow: var(--ins-shadow-focus); }
+  .input.error { border-color: var(--ins-danger-500); }
+  .err { font-size: 12px; color: var(--ins-danger-700); }
+  .grp { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+</style>
+<div class="stack">
+  <div class="grp">
+    <div class="field"><label class="lbl">Nome do produto</label><input class="input" value="Tênis Runner 3.0"></div>
+    <div class="field"><label class="lbl">SKU</label><input class="input" value="SKU-8421-BR"></div>
+  </div>
+  <div class="field">
+    <label class="lbl">Preço promocional</label>
+    <input class="input error" value="R$ 1.299,00">
+    <div class="err">O preço promocional deve ser menor que o preço de venda.</div>
+  </div>
+</div>

@@ -1,0 +1,25 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border-radius: var(--ins-radius-sm); background: var(--ins-neutral-50); }
+  .cell i { color: var(--ins-fg); }
+  .lbl { font-family: var(--ins-font-mono); font-size: 10px; color: var(--ins-fg-muted); }
+</style>
+<div class="grid">
+  <div class="cell"><i data-lucide="package"></i><span class="lbl">package</span></div>
+  <div class="cell"><i data-lucide="tag"></i><span class="lbl">tag</span></div>
+  <div class="cell"><i data-lucide="bookmark"></i><span class="lbl">bookmark</span></div>
+  <div class="cell"><i data-lucide="layers"></i><span class="lbl">layers</span></div>
+  <div class="cell"><i data-lucide="shopping-cart"></i><span class="lbl">cart</span></div>
+  <div class="cell"><i data-lucide="receipt"></i><span class="lbl">receipt</span></div>
+  <div class="cell"><i data-lucide="bar-chart-3"></i><span class="lbl">chart</span></div>
+  <div class="cell"><i data-lucide="boxes"></i><span class="lbl">boxes</span></div>
+  <div class="cell"><i data-lucide="banknote"></i><span class="lbl">banknote</span></div>
+  <div class="cell"><i data-lucide="user"></i><span class="lbl">user</span></div>
+  <div class="cell"><i data-lucide="settings"></i><span class="lbl">settings</span></div>
+  <div class="cell"><i data-lucide="search"></i><span class="lbl">search</span></div>
+  <div class="cell"><i data-lucide="plus"></i><span class="lbl">plus</span></div>
+  <div class="cell"><i data-lucide="trash-2"></i><span class="lbl">trash</span></div>
+</div>
+<script>lucide.createIcons();</script>

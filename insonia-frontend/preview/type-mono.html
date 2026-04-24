@@ -1,0 +1,24 @@
+<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="_card.css">
+<style>
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .group { display: flex; flex-direction: column; gap: 8px; }
+  .lbl { font-size: 11px; color: var(--ins-fg-muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+  .mono { font-family: var(--ins-font-mono); font-variant-numeric: tabular-nums; }
+  .price { font-size: 28px; font-weight: 500; color: var(--ins-fg); }
+  .sku { font-size: 14px; color: var(--ins-fg-muted); }
+  .tbl { font-size: 13px; color: var(--ins-fg); line-height: 1.8; }
+</style>
+<div class="grid">
+  <div class="group">
+    <div class="lbl">Preços &amp; totais</div>
+    <div class="mono price">R$ 1.249,90</div>
+    <div class="mono price" style="color:var(--ins-danger-500)">−R$ 89,00</div>
+    <div class="mono price" style="color:var(--ins-success-700); font-size:18px">+R$ 342,50 lucro</div>
+  </div>
+  <div class="group">
+    <div class="lbl">SKU / IDs / tabelas</div>
+    <div class="mono sku">SKU-8421-BR</div>
+    <div class="mono sku">#V-00234 · 12/04/2026</div>
+    <div class="mono tbl">12 × 4 = 48<br/>23,50 × 3 = 70,50<br/>&nbsp;9,90 × 7 = 69,30</div>
+  </div>
+</div>
