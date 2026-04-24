@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Gerencia o ciclo de vida da aplicação (startup e shutdown)."""
     # Código aqui roda UMA VEZ quando o servidor sobe
     print("Servidor subindo...")
     yield

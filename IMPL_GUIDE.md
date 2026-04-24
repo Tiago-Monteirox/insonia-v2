@@ -164,10 +164,11 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
-    pass
+    """Classe base para todos os modelos SQLAlchemy do projeto."""
 
 
 async def get_db() -> AsyncSession:
+    """Dependency do FastAPI que fornece uma sessão assíncrona por request."""
     async with AsyncSessionLocal() as session:
         yield session
 ```
@@ -185,6 +186,7 @@ from fastapi import FastAPI
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Gerencia o ciclo de vida da aplicação (startup e shutdown)."""
     # Código aqui roda UMA VEZ quando o servidor sobe
     print("Servidor subindo...")
     yield
@@ -197,6 +199,7 @@ app = FastAPI(title="Insonia v2", lifespan=lifespan)
 
 @app.get("/health")
 async def health():
+    """Verifica se a API está no ar."""
     return {"status": "ok"}
 ```
 
@@ -251,6 +254,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline():
+    """Executa as migrations sem conexão ativa ao banco (modo offline)."""
     context.configure(
         url=DATABASE_URL,
         target_metadata=target_metadata,
@@ -261,6 +265,7 @@ def run_migrations_offline():
 
 
 async def run_migrations_online():
+    """Executa as migrations com conexão ativa ao banco (modo online, async)."""
     connectable = create_async_engine(DATABASE_URL)
     async with connectable.connect() as connection:
         await connection.run_sync(
@@ -292,6 +297,8 @@ from app.core.database import Base
 
 
 class Categoria(Base):
+    """Modelo de categoria de produto."""
+
     __tablename__ = "categorias"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -308,6 +315,8 @@ from app.core.database import Base
 
 
 class Marca(Base):
+    """Modelo de marca de produto."""
+
     __tablename__ = "marcas"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -326,6 +335,8 @@ from app.core.database import Base
 
 
 class Produto(Base):
+    """Modelo de produto com preços, estoque e imagens."""
+
     __tablename__ = "produtos"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -348,6 +359,8 @@ class Produto(Base):
 
 
 class ProdutoImagem(Base):
+    """Modelo de imagem associada a um produto."""
+
     __tablename__ = "produto_imagens"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -366,6 +379,8 @@ from app.core.database import Base
 
 
 class NomeVariacao(Base):
+    """Nome de um atributo de variação (ex: Tamanho, Cor)."""
+
     __tablename__ = "nome_variacoes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -375,6 +390,8 @@ class NomeVariacao(Base):
 
 
 class ValorVariacao(Base):
+    """Valor concreto de um atributo de variação (ex: M, Azul)."""
+
     __tablename__ = "valor_variacoes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -387,6 +404,8 @@ class ValorVariacao(Base):
 
 
 class Variacao(Base):
+    """Associação entre produto e um valor de variação específico."""
+
     __tablename__ = "variacoes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -408,6 +427,8 @@ from app.core.database import Base
 
 
 class Venda(Base):
+    """Registro de uma venda com totais calculados."""
+
     __tablename__ = "vendas"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -420,6 +441,8 @@ class Venda(Base):
 
 
 class ItemVenda(Base):
+    """Item individual de uma venda, com preço e custo no momento da compra."""
+
     __tablename__ = "itens_venda"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -462,6 +485,7 @@ from slugify import slugify
 @event.listens_for(Produto, "before_insert")
 @event.listens_for(Produto, "before_update")
 def gerar_slug_produto(mapper, connection, target):
+    """Gera slug automaticamente a partir do nome antes de inserir ou atualizar."""
     if target.name and not target.slug:
         target.slug = slugify(target.name)
 ```
@@ -501,6 +525,8 @@ from app.core.database import Base
 
 
 class User(SQLAlchemyBaseUserTable[int], Base):
+    """Modelo de usuário com campos extras além do padrão fastapi-users."""
+
     __tablename__ = "users"
 
     # SQLAlchemyBaseUserTable já inclui: id, email, hashed_password, is_active, is_superuser, is_verified
@@ -523,6 +549,7 @@ from app.models.user import User
 
 
 async def get_user_db(session: AsyncSession):
+    """Dependency que fornece o adaptador de banco para fastapi-users."""
     yield SQLAlchemyUserDatabase(session, User)
 
 
@@ -530,6 +557,7 @@ bearer_transport = BearerTransport(tokenUrl="auth/login")
 
 
 def get_jwt_strategy() -> JWTStrategy:
+    """Retorna a estratégia JWT configurada com chave e tempo de expiração."""
     return JWTStrategy(secret=SECRET_KEY, lifetime_seconds=JWT_LIFETIME_SECONDS)
 
 
@@ -552,14 +580,20 @@ from fastapi_users import schemas
 
 
 class UserRead(schemas.BaseUser[int]):
+    """Schema de leitura do usuário, exposto nas respostas da API."""
+
     username: str
 
 
 class UserCreate(schemas.BaseUserCreate):
+    """Schema de criação de usuário no registro."""
+
     username: str
 
 
 class UserUpdate(schemas.BaseUserUpdate):
+    """Schema de atualização parcial do usuário."""
+
     username: str | None = None
 ```
 
@@ -577,6 +611,7 @@ from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Gerencia o ciclo de vida da aplicação (startup e shutdown)."""
     yield
 
 
@@ -585,6 +620,7 @@ app = FastAPI(title="Insonia v2", lifespan=lifespan)
 
 @app.get("/health")
 async def health():
+    """Verifica se a API está no ar."""
     return {"status": "ok"}
 
 
@@ -646,6 +682,7 @@ from app.models.produto import Produto
 
 
 async def verificar_estoque(db: AsyncSession, produto_id: int, quantidade: int) -> None:
+    """Levanta HTTPException se o produto não tiver estoque suficiente."""
     result = await db.execute(select(Produto.estoque).where(Produto.id == produto_id))
     estoque = result.scalar_one_or_none()
     if estoque is None:
@@ -655,6 +692,7 @@ async def verificar_estoque(db: AsyncSession, produto_id: int, quantidade: int) 
 
 
 async def decrementar_estoque(db: AsyncSession, produto_id: int, quantidade: int) -> None:
+    """Subtrai a quantidade do estoque do produto (usado ao registrar uma venda)."""
     await db.execute(
         update(Produto)
         .where(Produto.id == produto_id)
@@ -663,6 +701,7 @@ async def decrementar_estoque(db: AsyncSession, produto_id: int, quantidade: int
 
 
 async def incrementar_estoque(db: AsyncSession, produto_id: int, quantidade: int) -> None:
+    """Adiciona a quantidade ao estoque do produto (usado ao cancelar uma venda)."""
     await db.execute(
         update(Produto)
         .where(Produto.id == produto_id)
@@ -687,6 +726,8 @@ from app.services.estoque import decrementar_estoque, incrementar_estoque, verif
 
 @dataclass
 class ItemInput:
+    """Dados de um item a ser incluído em uma venda."""
+
     produto_id: int
     quantidade: int
     preco_venda: Decimal
@@ -694,6 +735,7 @@ class ItemInput:
 
 
 async def criar_venda(db: AsyncSession, usuario_id: int, itens: list[ItemInput]) -> Venda:
+    """Cria uma venda atomicamente: verifica estoque, decrementa e persiste os itens."""
     async with db.begin():
         # Verificar estoque de todos antes de qualquer decremento
         for item in itens:
@@ -729,6 +771,7 @@ async def criar_venda(db: AsyncSession, usuario_id: int, itens: list[ItemInput])
 
 
 async def remover_venda(db: AsyncSession, venda_id: int) -> None:
+    """Remove uma venda e restaura o estoque de todos os seus itens."""
     async with db.begin():
         result = await db.execute(
             select(Venda)
@@ -764,12 +807,16 @@ from decimal import Decimal
 
 @strawberry.type
 class MoneyType:
+    """Representa um valor monetário com moeda."""
+
     amount: float
     currency: str
 
 
 @strawberry.type
 class CategoriaType:
+    """Tipo GraphQL para categoria de produto."""
+
     id: int
     name: str
     slug: str
@@ -777,6 +824,8 @@ class CategoriaType:
 
 @strawberry.type
 class MarcaType:
+    """Tipo GraphQL para marca de produto."""
+
     id: int
     name: str
     slug: str
@@ -784,6 +833,8 @@ class MarcaType:
 
 @strawberry.type
 class ProdutoType:
+    """Tipo GraphQL para produto com preços e estoque."""
+
     id: int
     name: str
     slug: str
@@ -811,6 +862,7 @@ from app.models.produto import Produto
 
 
 def produto_model_to_type(p: Produto) -> ProdutoType:
+    """Converte um modelo ORM Produto para o tipo GraphQL ProdutoType."""
     return ProdutoType(
         id=p.id,
         name=p.name,
@@ -826,14 +878,18 @@ def produto_model_to_type(p: Produto) -> ProdutoType:
 
 @strawberry.type
 class Query:
+    """Raiz de queries GraphQL do projeto."""
+
     @strawberry.field
     async def todos_produtos(self, info: Info) -> list[ProdutoType]:
+        """Retorna todos os produtos cadastrados."""
         db = info.context["db"]
         result = await db.execute(select(Produto))
         return [produto_model_to_type(p) for p in result.scalars()]
 
     @strawberry.field
     async def produto(self, info: Info, id: int) -> Optional[ProdutoType]:
+        """Retorna um produto pelo ID, ou None se não encontrado."""
         db = info.context["db"]
         result = await db.execute(select(Produto).where(Produto.id == id))
         p = result.scalar_one_or_none()
@@ -841,6 +897,7 @@ class Query:
 
     @strawberry.field
     async def todas_categorias(self, info: Info) -> list[CategoriaType]:
+        """Retorna todas as categorias cadastradas."""
         db = info.context["db"]
         result = await db.execute(select(Categoria))
         rows = result.scalars().all()
@@ -860,12 +917,16 @@ from app.services.venda import ItemInput, criar_venda as svc_criar_venda
 
 @strawberry.input
 class ItemVendaInput:
+    """Input GraphQL para um item ao criar uma venda."""
+
     produto_id: int
     quantidade: int
 
 
 @strawberry.type
 class VendaResult:
+    """Resultado retornado após criação de uma venda."""
+
     id: int
     valor_total: float
     lucro_total: float
@@ -873,8 +934,11 @@ class VendaResult:
 
 @strawberry.type
 class Mutation:
+    """Raiz de mutations GraphQL do projeto."""
+
     @strawberry.mutation
     async def criar_venda(self, info: Info, itens: list[ItemVendaInput]) -> VendaResult:
+        """Cria uma venda para o usuário autenticado com os itens informados."""
         db = info.context["db"]
         user = info.context["user"]  # verificado na Fase 2
 
@@ -910,6 +974,7 @@ from app.graphql.mutations import Mutation
 
 
 async def get_context(db: AsyncSession) -> dict:
+    """Monta o contexto injetado em cada resolver GraphQL."""
     return {"db": db}
 
 
@@ -955,6 +1020,7 @@ ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
 async def salvar_imagem(file: UploadFile, produto_id: int) -> str:
+    """Valida e persiste um arquivo de imagem no disco, retornando o caminho salvo."""
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail=f"Tipo não permitido: {file.content_type}")
 
@@ -976,6 +1042,7 @@ async def upload_imagens(
     db: AsyncSession = Depends(get_db),
     user=Depends(current_active_user),
 ):
+    """Recebe múltiplos arquivos, salva no disco e registra os caminhos no banco."""
     paths = await asyncio.gather(*[salvar_imagem(f, produto_id) for f in files])
 
     imagens = [ProdutoImagem(produto_id=produto_id, path=p) for p in paths]
@@ -1066,6 +1133,7 @@ TestSessionLocal = async_sessionmaker(engine_test, expire_on_commit=False)
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def setup_db():
+    """Cria todas as tabelas antes dos testes e derruba ao final da sessão."""
     async with engine_test.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -1075,12 +1143,14 @@ async def setup_db():
 
 @pytest_asyncio.fixture
 async def db():
+    """Fornece uma sessão de banco de dados de teste para cada teste."""
     async with TestSessionLocal() as session:
         yield session
 
 
 @pytest_asyncio.fixture
 async def client(db):
+    """Fornece um AsyncClient com a dependência de banco substituída pelo banco de teste."""
     app.dependency_overrides[get_db] = lambda: db
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
@@ -1099,6 +1169,7 @@ from app.services.estoque import decrementar_estoque, verificar_estoque
 
 @pytest.mark.asyncio
 async def test_estoque_insuficiente(db, produto_fixture):
+    """Garante que verificar_estoque levanta 400 quando a quantidade excede o estoque."""
     with pytest.raises(HTTPException) as exc:
         await verificar_estoque(db, produto_fixture.id, quantidade=9999)
     assert exc.value.status_code == 400

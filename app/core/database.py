@@ -8,9 +8,10 @@ AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
 class Base(DeclarativeBase):
-    pass
+    """Classe base para todos os modelos SQLAlchemy do projeto."""
 
 
 async def get_db() -> AsyncSession:
+    """Dependency do FastAPI que fornece uma sessão assíncrona por request."""
     async with AsyncSessionLocal() as session:
         yield session
