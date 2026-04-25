@@ -1,12 +1,14 @@
 from decimal import Decimal
 
-from sqlalchemy import ForeignKey, Numeric, String, Text
+from slugify import slugify
+from sqlalchemy import ForeignKey, Numeric, String, Text, event
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.mixins import SlugMixin
 
 
-class Product(Base):
+class Product(SlugMixin, Base):
     """Modelo de produto com preços, estoque e imagens."""
 
     __tablename__ = "produtos"

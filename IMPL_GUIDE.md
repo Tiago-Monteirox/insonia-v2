@@ -294,9 +294,10 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.models.mixins import SlugMixin
 
 
-class Category(Base):
+class Category(SlugMixin, Base):
     """Modelo de categoria de produto."""
 
     __tablename__ = "categorias"
@@ -312,9 +313,10 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
+from app.models.mixins import SlugMixin
 
 
-class Brand(Base):
+class Brand(SlugMixin, Base):
     """Modelo de marca de produto."""
 
     __tablename__ = "marcas"
@@ -332,9 +334,10 @@ from sqlalchemy import ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.models.mixins import SlugMixin
 
 
-class Product(Base):
+class Product(SlugMixin, Base):
     """Modelo de produto com preços, estoque e imagens."""
 
     __tablename__ = "produtos"
@@ -474,21 +477,30 @@ __all__ = [
 
 ### 1.3 — Slug automático
 
-Adicione ao final de `app/models/product.py` (e repita para `Category` e `Brand`):
+Crie `app/models/mixins.py` com o mixin reutilizável — assim `Category`, `Brand` e `Product` herdam o comportamento sem repetir código:
 
 ```python
-# Adicionar ao final de app/models/product.py
+# app/models/mixins.py
 from sqlalchemy import event
 from slugify import slugify
 
 
-@event.listens_for(Product, "before_insert")
-@event.listens_for(Product, "before_update")
-def generate_product_slug(mapper, connection, target):
+def _generate_slug(mapper, connection, target):
     """Gera slug automaticamente a partir do nome antes de inserir ou atualizar."""
     if target.name and not target.slug:
         target.slug = slugify(target.name)
+
+
+class SlugMixin:
+    """Mixin que registra automaticamente o listener de slug ao ser herdado."""
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        event.listen(cls, "before_insert", _generate_slug)
+        event.listen(cls, "before_update", _generate_slug)
 ```
+
+Os modelos já herdam `SlugMixin` conforme definido na seção 1.2 — nenhuma chamada adicional necessária.
 
 ### 1.4 — Gerar e aplicar migration
 
