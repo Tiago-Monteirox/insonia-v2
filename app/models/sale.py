@@ -14,7 +14,7 @@ class Sale(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    sale_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    sale_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now)
     total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
     total_profit: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
 
