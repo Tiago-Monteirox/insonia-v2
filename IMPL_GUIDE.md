@@ -289,14 +289,14 @@ else:
 Crie cada arquivo separado por domínio:
 
 ```python
-# app/models/categoria.py
+# app/models/category.py
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
 
-class Categoria(Base):
+class Category(Base):
     """Modelo de categoria de produto."""
 
     __tablename__ = "categorias"
@@ -307,14 +307,14 @@ class Categoria(Base):
 ```
 
 ```python
-# app/models/marca.py
+# app/models/brand.py
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
 
-class Marca(Base):
+class Brand(Base):
     """Modelo de marca de produto."""
 
     __tablename__ = "marcas"
@@ -325,7 +325,7 @@ class Marca(Base):
 ```
 
 ```python
-# app/models/produto.py
+# app/models/product.py
 from decimal import Decimal
 
 from sqlalchemy import ForeignKey, Numeric, String, Text
@@ -334,7 +334,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
-class Produto(Base):
+class Product(Base):
     """Modelo de produto com preços, estoque e imagens."""
 
     __tablename__ = "produtos"
@@ -342,43 +342,43 @@ class Produto(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     slug: Mapped[str] = mapped_column(String(220), unique=True)
-    descricao: Mapped[str | None] = mapped_column(Text)
-    estoque: Mapped[int] = mapped_column(default=0)
+    description: Mapped[str | None] = mapped_column(Text)
+    stock: Mapped[int] = mapped_column(default=0)
 
     # Preços como Numeric — armazena centavos com precisão
-    preco_venda: Mapped[Decimal] = mapped_column(Numeric(14, 2))
-    preco_custo: Mapped[Decimal] = mapped_column(Numeric(14, 2))
-    preco_venda_promocional: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    sale_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    cost_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    promotional_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
 
     currency: Mapped[str] = mapped_column(String(3), default="BRL")
 
-    categoria_id: Mapped[int | None] = mapped_column(ForeignKey("categorias.id"))
-    marca_id: Mapped[int | None] = mapped_column(ForeignKey("marcas.id"))
+    category_id: Mapped[int | None] = mapped_column(ForeignKey("categorias.id"))
+    brand_id: Mapped[int | None] = mapped_column(ForeignKey("marcas.id"))
 
-    imagens: Mapped[list["ProdutoImagem"]] = relationship(back_populates="produto")
+    images: Mapped[list["ProductImage"]] = relationship(back_populates="product")
 
 
-class ProdutoImagem(Base):
+class ProductImage(Base):
     """Modelo de imagem associada a um produto."""
 
     __tablename__ = "produto_imagens"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    produto_id: Mapped[int] = mapped_column(ForeignKey("produtos.id", ondelete="CASCADE"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("produtos.id", ondelete="CASCADE"))
     path: Mapped[str] = mapped_column(String(500))
 
-    produto: Mapped["Produto"] = relationship(back_populates="imagens")
+    product: Mapped["Product"] = relationship(back_populates="images")
 ```
 
 ```python
-# app/models/variacao.py
+# app/models/variation.py
 from sqlalchemy import ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 
-class NomeVariacao(Base):
+class VariationName(Base):
     """Nome de um atributo de variação (ex: Tamanho, Cor)."""
 
     __tablename__ = "nome_variacoes"
@@ -386,37 +386,37 @@ class NomeVariacao(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
 
-    valores: Mapped[list["ValorVariacao"]] = relationship(back_populates="nome")
+    values: Mapped[list["VariationValue"]] = relationship(back_populates="variation_name")
 
 
-class ValorVariacao(Base):
+class VariationValue(Base):
     """Valor concreto de um atributo de variação (ex: M, Azul)."""
 
     __tablename__ = "valor_variacoes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    nome_id: Mapped[int] = mapped_column(ForeignKey("nome_variacoes.id"))
-    valor: Mapped[str] = mapped_column(String(100))
+    name_id: Mapped[int] = mapped_column(ForeignKey("nome_variacoes.id"))
+    value: Mapped[str] = mapped_column(String(100))
 
-    nome: Mapped["NomeVariacao"] = relationship(back_populates="valores")
+    variation_name: Mapped["VariationName"] = relationship(back_populates="values")
 
-    __table_args__ = (UniqueConstraint("nome_id", "valor"),)
+    __table_args__ = (UniqueConstraint("name_id", "value"),)
 
 
-class Variacao(Base):
+class Variation(Base):
     """Associação entre produto e um valor de variação específico."""
 
     __tablename__ = "variacoes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    produto_id: Mapped[int] = mapped_column(ForeignKey("produtos.id", ondelete="CASCADE"))
-    valor_variacao_id: Mapped[int] = mapped_column(ForeignKey("valor_variacoes.id"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("produtos.id", ondelete="CASCADE"))
+    variation_value_id: Mapped[int] = mapped_column(ForeignKey("valor_variacoes.id"))
 
-    __table_args__ = (UniqueConstraint("produto_id", "valor_variacao_id"),)
+    __table_args__ = (UniqueConstraint("product_id", "variation_value_id"),)
 ```
 
 ```python
-# app/models/venda.py
+# app/models/sale.py
 from datetime import datetime
 from decimal import Decimal
 
@@ -426,65 +426,65 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
 
 
-class Venda(Base):
+class Sale(Base):
     """Registro de uma venda com totais calculados."""
 
     __tablename__ = "vendas"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    usuario_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    data_venda: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    valor_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
-    lucro_total: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    sale_date: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    total_amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
+    total_profit: Mapped[Decimal] = mapped_column(Numeric(14, 2), default=0)
 
-    itens: Mapped[list["ItemVenda"]] = relationship(back_populates="venda", cascade="all, delete-orphan")
+    items: Mapped[list["SaleItem"]] = relationship(back_populates="sale", cascade="all, delete-orphan")
 
 
-class ItemVenda(Base):
+class SaleItem(Base):
     """Item individual de uma venda, com preço e custo no momento da compra."""
 
     __tablename__ = "itens_venda"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    venda_id: Mapped[int] = mapped_column(ForeignKey("vendas.id", ondelete="CASCADE"))
-    produto_id: Mapped[int] = mapped_column(ForeignKey("produtos.id", ondelete="RESTRICT"))
-    quantidade: Mapped[int]
-    preco_venda: Mapped[Decimal] = mapped_column(Numeric(14, 2))
-    preco_custo: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    sale_id: Mapped[int] = mapped_column(ForeignKey("vendas.id", ondelete="CASCADE"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("produtos.id", ondelete="RESTRICT"))
+    quantity: Mapped[int]
+    sale_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
+    cost_price: Mapped[Decimal] = mapped_column(Numeric(14, 2))
 
-    venda: Mapped["Venda"] = relationship(back_populates="itens")
+    sale: Mapped["Sale"] = relationship(back_populates="items")
 ```
 
 **`app/models/__init__.py`** — importe todos para o Alembic detectar:
 
 ```python
 # app/models/__init__.py
-from app.models.categoria import Categoria
-from app.models.marca import Marca
-from app.models.produto import Produto, ProdutoImagem
-from app.models.variacao import NomeVariacao, ValorVariacao, Variacao
-from app.models.venda import ItemVenda, Venda
+from app.models.category import Category
+from app.models.brand import Brand
+from app.models.product import Product, ProductImage
+from app.models.variation import VariationName, VariationValue, Variation
+from app.models.sale import SaleItem, Sale
 
 __all__ = [
-    "Categoria", "Marca", "Produto", "ProdutoImagem",
-    "NomeVariacao", "ValorVariacao", "Variacao",
-    "Venda", "ItemVenda",
+    "Category", "Brand", "Product", "ProductImage",
+    "VariationName", "VariationValue", "Variation",
+    "Sale", "SaleItem",
 ]
 ```
 
 ### 1.3 — Slug automático
 
-Adicione ao final de `app/models/produto.py` (e repita para `Categoria` e `Marca`):
+Adicione ao final de `app/models/product.py` (e repita para `Category` e `Brand`):
 
 ```python
-# Adicionar ao final de app/models/produto.py
+# Adicionar ao final de app/models/product.py
 from sqlalchemy import event
 from slugify import slugify
 
 
-@event.listens_for(Produto, "before_insert")
-@event.listens_for(Produto, "before_update")
-def gerar_slug_produto(mapper, connection, target):
+@event.listens_for(Product, "before_insert")
+@event.listens_for(Product, "before_update")
+def generate_product_slug(mapper, connection, target):
     """Gera slug automaticamente a partir do nome antes de inserir ou atualizar."""
     if target.name and not target.slug:
         target.slug = slugify(target.name)
@@ -673,46 +673,46 @@ $ uv run alembic upgrade head
 ### 3.1 — Serviço de estoque
 
 ```python
-# app/services/estoque.py
+# app/services/stock.py
 from fastapi import HTTPException
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.produto import Produto
+from app.models.product import Product
 
 
-async def verificar_estoque(db: AsyncSession, produto_id: int, quantidade: int) -> None:
+async def check_stock(db: AsyncSession, product_id: int, quantity: int) -> None:
     """Levanta HTTPException se o produto não tiver estoque suficiente."""
-    result = await db.execute(select(Produto.estoque).where(Produto.id == produto_id))
-    estoque = result.scalar_one_or_none()
-    if estoque is None:
+    result = await db.execute(select(Product.stock).where(Product.id == product_id))
+    stock = result.scalar_one_or_none()
+    if stock is None:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
-    if estoque < quantidade:
-        raise HTTPException(status_code=400, detail=f"Estoque insuficiente: {estoque} disponível")
+    if stock < quantity:
+        raise HTTPException(status_code=400, detail=f"Estoque insuficiente: {stock} disponível")
 
 
-async def decrementar_estoque(db: AsyncSession, produto_id: int, quantidade: int) -> None:
+async def decrement_stock(db: AsyncSession, product_id: int, quantity: int) -> None:
     """Subtrai a quantidade do estoque do produto (usado ao registrar uma venda)."""
     await db.execute(
-        update(Produto)
-        .where(Produto.id == produto_id)
-        .values(estoque=Produto.estoque - quantidade)
+        update(Product)
+        .where(Product.id == product_id)
+        .values(stock=Product.stock - quantity)
     )
 
 
-async def incrementar_estoque(db: AsyncSession, produto_id: int, quantidade: int) -> None:
+async def increment_stock(db: AsyncSession, product_id: int, quantity: int) -> None:
     """Adiciona a quantidade ao estoque do produto (usado ao cancelar uma venda)."""
     await db.execute(
-        update(Produto)
-        .where(Produto.id == produto_id)
-        .values(estoque=Produto.estoque + quantidade)
+        update(Product)
+        .where(Product.id == product_id)
+        .values(stock=Product.stock + quantity)
     )
 ```
 
 ### 3.2 — Serviço de venda
 
 ```python
-# app/services/venda.py
+# app/services/sale.py
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -720,73 +720,73 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.venda import ItemVenda, Venda
-from app.services.estoque import decrementar_estoque, incrementar_estoque, verificar_estoque
+from app.models.sale import SaleItem, Sale
+from app.services.stock import decrement_stock, increment_stock, check_stock
 
 
 @dataclass
 class ItemInput:
     """Dados de um item a ser incluído em uma venda."""
 
-    produto_id: int
-    quantidade: int
-    preco_venda: Decimal
-    preco_custo: Decimal
+    product_id: int
+    quantity: int
+    sale_price: Decimal
+    cost_price: Decimal
 
 
-async def criar_venda(db: AsyncSession, usuario_id: int, itens: list[ItemInput]) -> Venda:
+async def create_sale(db: AsyncSession, user_id: int, items: list[ItemInput]) -> Sale:
     """Cria uma venda atomicamente: verifica estoque, decrementa e persiste os itens."""
     async with db.begin():
         # Verificar estoque de todos antes de qualquer decremento
-        for item in itens:
-            await verificar_estoque(db, item.produto_id, item.quantidade)
+        for item in items:
+            await check_stock(db, item.product_id, item.quantity)
 
-        venda = Venda(usuario_id=usuario_id)
-        db.add(venda)
-        await db.flush()  # flush para obter venda.id sem commitar
+        sale = Sale(user_id=user_id)
+        db.add(sale)
+        await db.flush()  # flush para obter sale.id sem commitar
 
-        valor_total = Decimal("0")
-        lucro_total = Decimal("0")
+        total_amount = Decimal("0")
+        total_profit = Decimal("0")
 
-        for item in itens:
-            iv = ItemVenda(
-                venda_id=venda.id,
-                produto_id=item.produto_id,
-                quantidade=item.quantidade,
-                preco_venda=item.preco_venda,
-                preco_custo=item.preco_custo,
+        for item in items:
+            iv = SaleItem(
+                sale_id=sale.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                sale_price=item.sale_price,
+                cost_price=item.cost_price,
             )
             db.add(iv)
-            await decrementar_estoque(db, item.produto_id, item.quantidade)
+            await decrement_stock(db, item.product_id, item.quantity)
 
-            subtotal = item.preco_venda * item.quantidade
-            custo_total = item.preco_custo * item.quantidade
-            valor_total += subtotal
-            lucro_total += subtotal - custo_total
+            subtotal = item.sale_price * item.quantity
+            total_cost = item.cost_price * item.quantity
+            total_amount += subtotal
+            total_profit += subtotal - total_cost
 
-        venda.valor_total = valor_total
-        venda.lucro_total = lucro_total
+        sale.total_amount = total_amount
+        sale.total_profit = total_profit
 
-    return venda
+    return sale
 
 
-async def remover_venda(db: AsyncSession, venda_id: int) -> None:
+async def remove_sale(db: AsyncSession, sale_id: int) -> None:
     """Remove uma venda e restaura o estoque de todos os seus itens."""
     async with db.begin():
         result = await db.execute(
-            select(Venda)
-            .options(selectinload(Venda.itens))
-            .where(Venda.id == venda_id)
+            select(Sale)
+            .options(selectinload(Sale.items))
+            .where(Sale.id == sale_id)
         )
-        venda = result.scalar_one_or_none()
-        if venda is None:
+        sale = result.scalar_one_or_none()
+        if sale is None:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
-        for item in venda.itens:
-            await incrementar_estoque(db, item.produto_id, item.quantidade)
+        for item in sale.items:
+            await increment_stock(db, item.product_id, item.quantity)
 
-        await db.delete(venda)
+        await db.delete(sale)
 ```
 
 > **Nota sobre `async with db.begin()`:** isso garante que ou tudo salva, ou nada salva. Se der erro no meio da criação dos itens, o estoque não é decrementado e a venda não existe. Equivalente ao `@transaction.atomic` do Django.
@@ -814,7 +814,7 @@ class MoneyType:
 
 
 @strawberry.type
-class CategoriaType:
+class CategoryType:
     """Tipo GraphQL para categoria de produto."""
 
     id: int
@@ -823,7 +823,7 @@ class CategoriaType:
 
 
 @strawberry.type
-class MarcaType:
+class BrandType:
     """Tipo GraphQL para marca de produto."""
 
     id: int
@@ -832,17 +832,17 @@ class MarcaType:
 
 
 @strawberry.type
-class ProdutoType:
+class ProductType:
     """Tipo GraphQL para produto com preços e estoque."""
 
     id: int
     name: str
     slug: str
-    descricao: str | None
-    estoque: int
-    preco_venda: MoneyType
-    preco_custo: MoneyType
-    preco_venda_promocional: MoneyType | None
+    description: str | None
+    stock: int
+    sale_price: MoneyType
+    cost_price: MoneyType
+    promotional_price: MoneyType | None
 ```
 
 ### 4.2 — Queries
@@ -855,24 +855,24 @@ import strawberry
 from sqlalchemy import select
 from strawberry.types import Info
 
-from app.graphql.types import CategoriaType, MarcaType, ProdutoType, MoneyType
-from app.models.categoria import Categoria
-from app.models.marca import Marca
-from app.models.produto import Produto
+from app.graphql.types import CategoryType, BrandType, ProductType, MoneyType
+from app.models.category import Category
+from app.models.brand import Brand
+from app.models.product import Product
 
 
-def produto_model_to_type(p: Produto) -> ProdutoType:
-    """Converte um modelo ORM Produto para o tipo GraphQL ProdutoType."""
-    return ProdutoType(
+def product_model_to_type(p: Product) -> ProductType:
+    """Converte um modelo ORM de produto para o tipo GraphQL correspondente."""
+    return ProductType(
         id=p.id,
         name=p.name,
         slug=p.slug,
-        descricao=p.descricao,
-        estoque=p.estoque,
-        preco_venda=MoneyType(amount=float(p.preco_venda), currency=p.currency),
-        preco_custo=MoneyType(amount=float(p.preco_custo), currency=p.currency),
-        preco_venda_promocional=MoneyType(amount=float(p.preco_venda_promocional), currency=p.currency)
-        if p.preco_venda_promocional else None,
+        description=p.description,
+        stock=p.stock,
+        sale_price=MoneyType(amount=float(p.sale_price), currency=p.currency),
+        cost_price=MoneyType(amount=float(p.cost_price), currency=p.currency),
+        promotional_price=MoneyType(amount=float(p.promotional_price), currency=p.currency)
+        if p.promotional_price else None,
     )
 
 
@@ -881,27 +881,27 @@ class Query:
     """Raiz de queries GraphQL do projeto."""
 
     @strawberry.field
-    async def todos_produtos(self, info: Info) -> list[ProdutoType]:
+    async def all_products(self, info: Info) -> list[ProductType]:
         """Retorna todos os produtos cadastrados."""
         db = info.context["db"]
-        result = await db.execute(select(Produto))
-        return [produto_model_to_type(p) for p in result.scalars()]
+        result = await db.execute(select(Product))
+        return [product_model_to_type(p) for p in result.scalars()]
 
     @strawberry.field
-    async def produto(self, info: Info, id: int) -> Optional[ProdutoType]:
+    async def product(self, info: Info, id: int) -> Optional[ProductType]:
         """Retorna um produto pelo ID, ou None se não encontrado."""
         db = info.context["db"]
-        result = await db.execute(select(Produto).where(Produto.id == id))
+        result = await db.execute(select(Product).where(Product.id == id))
         p = result.scalar_one_or_none()
-        return produto_model_to_type(p) if p else None
+        return product_model_to_type(p) if p else None
 
     @strawberry.field
-    async def todas_categorias(self, info: Info) -> list[CategoriaType]:
+    async def all_categories(self, info: Info) -> list[CategoryType]:
         """Retorna todas as categorias cadastradas."""
         db = info.context["db"]
-        result = await db.execute(select(Categoria))
+        result = await db.execute(select(Category))
         rows = result.scalars().all()
-        return [CategoriaType(id=r.id, name=r.name, slug=r.slug) for r in rows]
+        return [CategoryType(id=r.id, name=r.name, slug=r.slug) for r in rows]
 ```
 
 ### 4.3 — Mutations
@@ -911,25 +911,25 @@ class Query:
 import strawberry
 from strawberry.types import Info
 
-from app.graphql.types import ProdutoType
-from app.services.venda import ItemInput, criar_venda as svc_criar_venda
+from app.graphql.types import ProductType
+from app.services.sale import ItemInput, create_sale as svc_create_sale
 
 
 @strawberry.input
-class ItemVendaInput:
+class SaleItemInput:
     """Input GraphQL para um item ao criar uma venda."""
 
-    produto_id: int
-    quantidade: int
+    product_id: int
+    quantity: int
 
 
 @strawberry.type
-class VendaResult:
+class SaleResult:
     """Resultado retornado após criação de uma venda."""
 
     id: int
-    valor_total: float
-    lucro_total: float
+    total_amount: float
+    total_profit: float
 
 
 @strawberry.type
@@ -937,28 +937,28 @@ class Mutation:
     """Raiz de mutations GraphQL do projeto."""
 
     @strawberry.mutation
-    async def criar_venda(self, info: Info, itens: list[ItemVendaInput]) -> VendaResult:
+    async def create_sale(self, info: Info, items: list[SaleItemInput]) -> SaleResult:
         """Cria uma venda para o usuário autenticado com os itens informados."""
         db = info.context["db"]
         user = info.context["user"]  # verificado na Fase 2
 
         # Buscar preços do banco para não confiar no cliente
         from sqlalchemy import select
-        from app.models.produto import Produto
+        from app.models.product import Product
 
         items_input = []
-        for item in itens:
-            result = await db.execute(select(Produto).where(Produto.id == item.produto_id))
-            produto = result.scalar_one()
+        for item in items:
+            result = await db.execute(select(Product).where(Product.id == item.product_id))
+            product = result.scalar_one()
             items_input.append(ItemInput(
-                produto_id=item.produto_id,
-                quantidade=item.quantidade,
-                preco_venda=produto.preco_venda,
-                preco_custo=produto.preco_custo,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                sale_price=product.sale_price,
+                cost_price=product.cost_price,
             ))
 
-        venda = await svc_criar_venda(db, user.id, items_input)
-        return VendaResult(id=venda.id, valor_total=float(venda.valor_total), lucro_total=float(venda.lucro_total))
+        sale = await svc_create_sale(db, user.id, items_input)
+        return SaleResult(id=sale.id, total_amount=float(sale.total_amount), total_profit=float(sale.total_profit))
 ```
 
 ### 4.4 — Montar o schema e conectar no FastAPI
@@ -999,7 +999,7 @@ Após subir, acesse `http://localhost:8000/graphql` para o GraphiQL (interface i
 ### 5.1 — Endpoint de upload
 
 ```python
-# app/routers/imagens.py
+# app/routers/images.py
 import asyncio
 import os
 from pathlib import Path
@@ -1010,7 +1010,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import current_active_user
 from app.core.config import MAX_IMAGE_SIZE_MB
 from app.core.database import get_db
-from app.models.produto import ProdutoImagem
+from app.models.product import ProductImage
 
 router = APIRouter(prefix="/produtos", tags=["imagens"])
 
@@ -1019,34 +1019,34 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
-async def salvar_imagem(file: UploadFile, produto_id: int) -> str:
+async def save_image(file: UploadFile, product_id: int) -> str:
     """Valida e persiste um arquivo de imagem no disco, retornando o caminho salvo."""
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail=f"Tipo não permitido: {file.content_type}")
 
-    conteudo = await file.read()
-    tamanho_mb = len(conteudo) / (1024 * 1024)
-    if tamanho_mb > MAX_IMAGE_SIZE_MB:
-        raise HTTPException(status_code=400, detail=f"Arquivo muito grande: {tamanho_mb:.1f}MB")
+    content = await file.read()
+    size_mb = len(content) / (1024 * 1024)
+    if size_mb > MAX_IMAGE_SIZE_MB:
+        raise HTTPException(status_code=400, detail=f"Arquivo muito grande: {size_mb:.1f}MB")
 
-    nome_arquivo = f"{produto_id}_{file.filename}"
-    caminho = UPLOAD_DIR / nome_arquivo
-    caminho.write_bytes(conteudo)
-    return str(caminho)
+    filename = f"{product_id}_{file.filename}"
+    file_path = UPLOAD_DIR / filename
+    file_path.write_bytes(content)
+    return str(file_path)
 
 
-@router.post("/{produto_id}/imagens")
-async def upload_imagens(
-    produto_id: int,
+@router.post("/{product_id}/imagens")
+async def upload_images(
+    product_id: int,
     files: list[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
     user=Depends(current_active_user),
 ):
     """Recebe múltiplos arquivos, salva no disco e registra os caminhos no banco."""
-    paths = await asyncio.gather(*[salvar_imagem(f, produto_id) for f in files])
+    paths = await asyncio.gather(*[save_image(f, product_id) for f in files])
 
-    imagens = [ProdutoImagem(produto_id=produto_id, path=p) for p in paths]
-    db.add_all(imagens)
+    images = [ProductImage(product_id=product_id, path=p) for p in paths]
+    db.add_all(images)
     await db.commit()
 
     return {"urls": [f"/media/{Path(p).name}" for p in paths]}
@@ -1055,10 +1055,10 @@ async def upload_imagens(
 Adicione ao `main.py`:
 ```python
 from fastapi.staticfiles import StaticFiles
-from app.routers.imagens import router as imagens_router
+from app.routers.images import router as images_router
 
 app.mount("/media", StaticFiles(directory="media"), name="media")
-app.include_router(imagens_router)
+app.include_router(images_router)
 ```
 
 ---
@@ -1086,11 +1086,11 @@ app.add_middleware(
 | Tela | Operação | Endpoint/Query |
 |------|----------|----------------|
 | Login | Autenticar | `POST /auth/login` |
-| Dashboard | Totais | Query `totalVendas` |
-| PDV | Listar produtos | Query `todosProdutos` |
-| PDV | Criar venda | Mutation `criarVenda` |
-| Produtos | Listar | Query `todosProdutos` |
-| Histórico | Vendas por período | Query `totalVendas(periodo: ...)` |
+| Dashboard | Totais | Query `totalSales` |
+| PDV | Listar produtos | Query `allProducts` |
+| PDV | Criar venda | Mutation `createSale` |
+| Produtos | Listar | Query `allProducts` |
+| Histórico | Vendas por período | Query `totalSales(periodo: ...)` |
 
 ### 6.3 — Interceptor de auth no frontend
 
@@ -1160,18 +1160,18 @@ async def client(db):
 ### 8.2 — Exemplo de teste de serviço
 
 ```python
-# tests/test_estoque.py
+# tests/test_stock.py
 import pytest
 from fastapi import HTTPException
 
-from app.services.estoque import decrementar_estoque, verificar_estoque
+from app.services.stock import decrement_stock, check_stock
 
 
 @pytest.mark.asyncio
-async def test_estoque_insuficiente(db, produto_fixture):
-    """Garante que verificar_estoque levanta 400 quando a quantidade excede o estoque."""
+async def test_insufficient_stock(db, product_fixture):
+    """Garante que check_stock levanta 400 quando a quantidade excede o estoque."""
     with pytest.raises(HTTPException) as exc:
-        await verificar_estoque(db, produto_fixture.id, quantidade=9999)
+        await check_stock(db, product_fixture.id, quantity=9999)
     assert exc.value.status_code == 400
 ```
 
