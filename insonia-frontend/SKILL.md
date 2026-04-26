@@ -12,6 +12,7 @@ Read `README.md` within this skill first for context, content fundamentals, visu
 - `assets/logo-original.jpg` — brand mark (eye-wordmark; request SVG from owner if possible)
 
 **Key constraints:**
+
 - Portuguese (BR) copy; domain nouns match backend: Produto, Venda, Categoria, Marca, Variação, Preço de venda, Lucro, Estoque
 - Single accent: muted teal `#0ab3ae`. No gradients, no decorative flourishes
 - Inter for UI, JetBrains Mono for prices/SKUs/tabular numerics

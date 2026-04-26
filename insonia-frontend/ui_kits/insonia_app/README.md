@@ -27,6 +27,7 @@ Desktop app for store owners/managers (touch-friendly). Single surface combining
 - `app.css` — all component styles built on `colors_and_type.css` vars
 
 ## Opens
+
 - Click through the sidebar to navigate
 - Click products in PDV to add to cart, adjust qty, finalize
 - Click "Sair" in topbar to see the Login screen

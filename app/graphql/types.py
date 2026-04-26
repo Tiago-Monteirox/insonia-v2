@@ -1,10 +1,12 @@
-import strawberry
 from decimal import Decimal
+
+import strawberry
 
 
 @strawberry.type
 class MoneyType:
     """Representa valor monetário como moeda."""
+
     amount: Decimal
     currency: str
 
@@ -12,6 +14,7 @@ class MoneyType:
 @strawberry.type
 class CategoryType:
     """Tipo GraphQL para categoria de produto."""
+
     id: int
     name: str
     slug: str
@@ -20,6 +23,7 @@ class CategoryType:
 @strawberry.type
 class BrandType:
     """Tipo GraphQL para marca de produto."""
+
     id: int
     name: str
     slug: str
@@ -28,6 +32,7 @@ class BrandType:
 @strawberry.type
 class ProductType:
     """Tipo GraphQL para produto com preços e estoque."""
+
     id: int
     name: str
     slug: str

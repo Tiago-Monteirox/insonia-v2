@@ -12,7 +12,9 @@ async def check_stock(db: AsyncSession, product_id: int, quantity: int) -> None:
     if stock is None:
         raise HTTPException(status_code=404, detail="Product not found")
     if stock < quantity:
-        raise HTTPException(status_code=400, detail=f"Insufficient stock: {stock} available")
+        raise HTTPException(
+            status_code=400, detail=f"Insufficient stock: {stock} available"
+        )
 
 
 async def decrement_stock(db: AsyncSession, product_id: int, quantity: int) -> None:

@@ -4,6 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from app.models.mixins import SlugMixin
 
+
 class Brand(SlugMixin, Base):
     """Modelo de marca de produto."""
 

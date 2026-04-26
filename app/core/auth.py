@@ -12,6 +12,7 @@ from app.core.config import JWT_LIFETIME_SECONDS, SECRET_KEY
 from app.core.database import get_db
 from app.models.user import User
 
+
 async def get_user_db(session: AsyncSession = Depends(get_db)):
     """Dependency que fornece o adaptador do db para fastapi-users."""
     yield SQLAlchemyUserDatabase(session, User)

@@ -29,13 +29,16 @@
 ---
 
 ### Fase 0 — Setup do Projeto
+
 **Objetivo:** repositório limpo com infraestrutura base funcionando.
 
 **Tarefas:**
+
 - [ ] Criar novo repositório `insonia-v2`
 - [ ] Inicializar com `uv init`, configurar `pyproject.toml`
 - [ ] Instalar dependências: fastapi, uvicorn, sqlalchemy, alembic, psycopg, strawberry-graphql, fastapi-users, python-moneyed, python-decouple, pydantic
 - [ ] Estrutura de diretórios:
+
   ```
   insonia/
   ├── app/
@@ -50,6 +53,7 @@
   ├── .env
   └── main.py
   ```
+
 - [ ] Configurar PostgreSQL local (Docker Compose ou instância direta)
 - [ ] `.env` com DATABASE_URL, SECRET_KEY, DEBUG
 - [ ] `main.py` com FastAPI app + lifespan
@@ -59,9 +63,11 @@
 ---
 
 ### Fase 1 — Modelos e Migrations
+
 **Objetivo:** todos os modelos do domínio criados e migrados no PostgreSQL.
 
 **Tarefas:**
+
 - [ ] Configurar SQLAlchemy async engine + session dependency
 - [ ] Criar modelos (em `app/models/`):
   - [ ] `Categoria` — id, name, slug (auto)
@@ -82,9 +88,11 @@
 ---
 
 ### Fase 2 — Autenticação
+
 **Objetivo:** JWT auth funcionando com fastapi-users.
 
 **Tarefas:**
+
 - [ ] Configurar fastapi-users com SQLAlchemy backend
 - [ ] Modelo User com campos: id, email, username, is_active, is_superuser
 - [ ] Rotas: `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /users/me`
@@ -97,9 +105,11 @@
 ---
 
 ### Fase 3 — Serviços de Negócio
+
 **Objetivo:** lógica de negócio isolada em serviços, sem depender de GraphQL ou REST.
 
 **Tarefas:**
+
 - [ ] `app/services/estoque.py`:
   - [ ] `verificar_estoque(db, produto_id, quantidade)` — lança exceção se insuficiente
   - [ ] `decrementar_estoque(db, produto_id, quantidade)` — atômico
@@ -118,9 +128,11 @@
 ---
 
 ### Fase 4 — GraphQL (Strawberry)
+
 **Objetivo:** schema GraphQL completo, espelhando o legado sem os bugs.
 
 **Tarefas:**
+
 - [ ] Configurar Strawberry com FastAPI (`strawberry.fastapi.GraphQLRouter`)
 - [ ] Types (`app/graphql/types.py`):
   - [ ] `MoneyType` — amount (float), currency (str)
@@ -146,9 +158,11 @@
 ---
 
 ### Fase 5 — Upload de Imagens
+
 **Objetivo:** upload de múltiplas imagens por produto funcionando (limitação do legado Django resolvida).
 
 **Tarefas:**
+
 - [ ] Endpoint `POST /produtos/{id}/imagens` — aceita `List[UploadFile]` (multipart/form-data com múltiplos arquivos)
 - [ ] Processar uploads em paralelo (`asyncio.gather`) — salvar cada arquivo e persistir registro no banco
 - [ ] Validar cada arquivo: tipo MIME (`image/jpeg`, `image/png`, `image/webp`), tamanho máximo configurável via `.env`
@@ -164,9 +178,11 @@
 ---
 
 ### Fase 6 — Wiring do Frontend (insonia_app)
+
 **Objetivo:** substituir `data.js` do admin por chamadas reais ao backend.
 
 **Tarefas:**
+
 - [ ] Definir contrato de API (quais queries/mutations cada tela consome)
 - [ ] Dashboard — query de totais de vendas, lucro, top produtos
 - [ ] PDV — query de produtos com estoque, mutation `criarVenda`
@@ -181,9 +197,11 @@
 ---
 
 ### Fase 7 — Wiring do Frontend (insonia_store)
+
 **Objetivo:** loja virtual conectada ao backend.
 
 **Tarefas:**
+
 - [ ] Home — query de produtos (lançamentos, promoções com preco_venda_promocional)
 - [ ] PDP — query `produto(id)` com variações e imagens
 - [ ] Cart — lógica de carrinho no frontend (localStorage), checkout via mutation `criarVenda`
@@ -194,9 +212,11 @@
 ---
 
 ### Fase 8 — Testes e Qualidade
+
 **Objetivo:** cobertura de testes razoável nos caminhos críticos.
 
 **Tarefas:**
+
 - [ ] Setup pytest-asyncio + httpx AsyncClient
 - [ ] Testes de serviço: estoque (decremento, rollback), calcular_totais, criar_venda atômica
 - [ ] Testes de integração GraphQL: criar_venda, remover_venda, verificar_estoque
@@ -209,9 +229,11 @@
 ---
 
 ### Fase 9 — Deploy
+
 **Objetivo:** projeto rodando em produção.
 
 **Tarefas:**
+
 - [ ] `Dockerfile` para a aplicação FastAPI
 - [ ] `docker-compose.yml` (app + postgres + nginx)
 - [ ] Configurar variáveis de ambiente de produção

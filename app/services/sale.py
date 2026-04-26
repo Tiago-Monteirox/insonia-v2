@@ -5,8 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.sale import SaleItem, Sale
-from app.services.stock import decrement_stock, increment_stock, check_stock
+from app.models.sale import Sale, SaleItem
+from app.services.stock import check_stock, decrement_stock, increment_stock
 
 
 @dataclass

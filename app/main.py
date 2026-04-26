@@ -1,14 +1,17 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.core.auth import auth_backend, fastapi_users
 from app.graphql.schema import graphql_app
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Gerencia o ciclo de vida da aplicação (startup e shutdown)."""
     yield
+
 
 app = FastAPI(title="Insonia v2", lifespan=lifespan)
 

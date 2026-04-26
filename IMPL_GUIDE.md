@@ -13,10 +13,10 @@
 ### 0.1 — Criar o repositório
 
 ```bash
-$ mkdir insonia-v2
-$ cd insonia-v2
-$ git init
-$ uv init .
+mkdir insonia-v2
+cd insonia-v2
+git init
+uv init .
 ```
 
 `uv init .` cria `pyproject.toml` e `.python-version` no diretório atual. Edite `pyproject.toml` para definir o nome do projeto:
@@ -47,21 +47,22 @@ Após rodar isso, `uv` cria `.venv/` e `uv.lock` automaticamente. Não precisa a
 Você cria isso na mão. Copie e cole no terminal:
 
 ```bash
-$ mkdir -p app/core app/models app/schemas app/graphql app/routers app/services
-$ mkdir -p migrations tests
-$ touch app/__init__.py
-$ touch app/core/__init__.py
-$ touch app/models/__init__.py
-$ touch app/schemas/__init__.py
-$ touch app/graphql/__init__.py
-$ touch app/routers/__init__.py
-$ touch app/services/__init__.py
-$ touch main.py
-$ touch .env
-$ touch .gitignore
+mkdir -p app/core app/models app/schemas app/graphql app/routers app/services
+mkdir -p migrations tests
+touch app/__init__.py
+touch app/core/__init__.py
+touch app/models/__init__.py
+touch app/schemas/__init__.py
+touch app/graphql/__init__.py
+touch app/routers/__init__.py
+touch app/services/__init__.py
+touch main.py
+touch .env
+touch .gitignore
 ```
 
 Resultado esperado:
+
 ```
 insonia-v2/
 ├── app/
@@ -108,13 +109,15 @@ volumes:
 ```
 
 Para subir o banco:
+
 ```bash
-$ docker compose up -d db
+docker compose up -d db
 ```
 
 Para verificar que está rodando:
+
 ```bash
-$ docker compose ps
+docker compose ps
 ```
 
 ### 0.5 — Arquivo `.env`
@@ -129,6 +132,7 @@ MAX_IMAGE_SIZE_MB=5
 ```
 
 Adicione `.env` ao `.gitignore`:
+
 ```
 # .gitignore
 .env
@@ -206,10 +210,11 @@ async def health():
 ### 0.9 — Verificar que funciona
 
 ```bash
-$ uv run uvicorn main:app --reload
+uv run uvicorn main:app --reload
 ```
 
 Abra no navegador:
+
 - `http://localhost:8000/health` → `{"status": "ok"}`
 - `http://localhost:8000/docs` → Swagger UI (documentação interativa automática)
 
@@ -222,12 +227,13 @@ Abra no navegador:
 ### 1.1 — Configurar Alembic
 
 ```bash
-$ uv run alembic init migrations
+uv run alembic init migrations
 ```
 
 Isso cria `migrations/env.py` e `alembic.ini`. Agora edite os dois:
 
 **`alembic.ini`** — encontre a linha `sqlalchemy.url` e deixe em branco (vamos pegar do `.env`):
+
 ```ini
 sqlalchemy.url =
 ```
@@ -513,8 +519,9 @@ $ uv run alembic upgrade head
 ```
 
 Verifique no banco:
+
 ```bash
-$ docker compose exec db psql -U insonia -d insonia -c "\dt"
+docker compose exec db psql -U insonia -d insonia -c "\dt"
 ```
 
 **Critério de aceitação da Fase 1:** todas as tabelas aparecem no `\dt`. ✓
@@ -662,8 +669,8 @@ app.include_router(
 ### 2.5 — Migration para User
 
 ```bash
-$ uv run alembic revision --autogenerate -m "add users table"
-$ uv run alembic upgrade head
+uv run alembic revision --autogenerate -m "add users table"
+uv run alembic upgrade head
 ```
 
 ### 2.6 — Testar via /docs
@@ -995,6 +1002,7 @@ graphql_app = GraphQLRouter(schema, context_getter=get_context)
 ```
 
 Adicione ao `main.py`:
+
 ```python
 from app.graphql.schema import graphql_app
 app.include_router(graphql_app, prefix="/graphql")
@@ -1429,6 +1437,7 @@ async def upload_images(
 ```
 
 Adicione ao `main.py`:
+
 ```python
 from fastapi.staticfiles import StaticFiles
 from app.routers.images import router as images_router

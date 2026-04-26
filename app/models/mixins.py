@@ -1,5 +1,5 @@
-from sqlalchemy import event
 from slugify import slugify
+from sqlalchemy import event
 
 
 def _generate_slug(mapper, connection, target):
