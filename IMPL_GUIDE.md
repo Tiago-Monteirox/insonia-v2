@@ -4,6 +4,11 @@
 > Público: quem nunca usou FastAPI antes.
 > Convenção: comandos de terminal começam com `$`. Blocos de código são os arquivos reais a criar.
 
+> **Filosofia de testes:** escreva testes **imediatamente após** cada camada de lógica — não deixe para o final.
+> Ordem: serviços → GraphQL mutations → auth → integração E2E.
+> A Fase 3.5 configura o ambiente de testes e já cobre a camada de serviços.
+> Cada fase seguinte tem sua seção de testes embutida.
+
 ---
 
 ## Fase 0 — Setup do Projeto
@@ -37,7 +42,7 @@ $ uv add fastapi "uvicorn[standard]" sqlalchemy asyncpg alembic \
          "strawberry-graphql[fastapi]" "fastapi-users[sqlalchemy]" \
          python-moneyed python-decouple python-slugify pydantic psycopg
 
-$ uv add --dev pytest pytest-asyncio httpx
+$ uv add --dev pytest pytest-asyncio httpx anyio
 ```
 
 Após rodar isso, `uv` cria `.venv/` e `uv.lock` automaticamente. Não precisa ativar o virtualenv — use sempre `uv run` ou `uv run python`.
@@ -812,6 +817,241 @@ async def remove_sale(db: AsyncSession, sale_id: int) -> None:
 
 ---
 
+## Fase 3.5 — Testes dos Serviços
+
+> **Por que testar aqui?** Os serviços (`sale.py`, `stock.py`) concentram a lógica financeira mais crítica do sistema: decremento de estoque, atomicidade de vendas, restauração de estoque ao cancelar. Um erro aqui é silencioso e impacta dinheiro. Cubra isso **antes** de construir a camada GraphQL em cima.
+
+### 3.5.1 — Adicionar dependências de teste
+
+```bash
+uv add --dev pytest pytest-asyncio httpx anyio
+```
+
+Crie `pyproject.toml` com a config do pytest:
+
+```toml
+# pyproject.toml — adicione esta seção:
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+```
+
+### 3.5.2 — Banco de testes e fixtures
+
+```python
+# tests/conftest.py
+import pytest
+import pytest_asyncio
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from app.core.database import Base, get_db
+from app.models.product import Product
+from app.models.sale import Sale
+from main import app
+
+TEST_DATABASE_URL = "postgresql+asyncpg://insonia:insonia@localhost:5432/insonia_test"
+
+engine_test = create_async_engine(TEST_DATABASE_URL)
+TestSessionLocal = async_sessionmaker(engine_test, expire_on_commit=False)
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def setup_db():
+    """Cria todas as tabelas antes dos testes e derruba ao final da sessão."""
+    async with engine_test.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    async with engine_test.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+
+
+@pytest_asyncio.fixture
+async def db():
+    """Sessão de banco isolada por teste — faz rollback ao final."""
+    async with TestSessionLocal() as session:
+        yield session
+
+
+@pytest_asyncio.fixture
+async def product(db: AsyncSession) -> Product:
+    """Produto de teste com estoque inicial = 10."""
+    p = Product(
+        name="Produto Teste",
+        sale_price="50.00",
+        cost_price="20.00",
+        stock=10,
+        currency="BRL",
+    )
+    db.add(p)
+    await db.commit()
+    await db.refresh(p)
+    return p
+
+
+@pytest_asyncio.fixture
+async def client(db: AsyncSession) -> AsyncClient:
+    """AsyncClient com banco de teste injetado."""
+    app.dependency_overrides[get_db] = lambda: db
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as c:
+        yield c
+    app.dependency_overrides.clear()
+```
+
+> **Por que criar um banco separado `insonia_test`?** Para não contaminar dados reais durante os testes. Crie o banco antes:
+> ```bash
+> docker compose exec db psql -U insonia -c "CREATE DATABASE insonia_test;"
+> ```
+
+### 3.5.3 — Testes do serviço de estoque
+
+```python
+# tests/test_stock.py
+import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.stock import check_stock, decrement_stock, increment_stock
+
+
+@pytest.mark.asyncio
+async def test_check_stock_suficiente(db: AsyncSession, product):
+    """check_stock não levanta nada quando há estoque suficiente."""
+    await check_stock(db, product.id, quantity=5)  # não deve levantar
+
+
+@pytest.mark.asyncio
+async def test_check_stock_insuficiente(db: AsyncSession, product):
+    """check_stock levanta HTTPException 400 quando a quantidade excede o estoque."""
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc:
+        await check_stock(db, product.id, quantity=100)
+    assert exc.value.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_check_stock_produto_inexistente(db: AsyncSession):
+    """check_stock levanta HTTPException 404 para produto que não existe."""
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as exc:
+        await check_stock(db, product_id=99999, quantity=1)
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_decrement_stock(db: AsyncSession, product):
+    """decrement_stock subtrai a quantidade correta do estoque."""
+    await decrement_stock(db, product.id, quantity=3)
+    await db.refresh(product)
+    assert product.stock == 7
+
+
+@pytest.mark.asyncio
+async def test_increment_stock(db: AsyncSession, product):
+    """increment_stock restaura a quantidade ao estoque."""
+    await decrement_stock(db, product.id, quantity=5)
+    await increment_stock(db, product.id, quantity=5)
+    await db.refresh(product)
+    assert product.stock == 10
+```
+
+### 3.5.4 — Testes do serviço de venda
+
+```python
+# tests/test_sale_service.py
+import pytest
+from decimal import Decimal
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.services.sale import ItemInput, create_sale, remove_sale
+
+
+@pytest.mark.asyncio
+async def test_create_sale_decrementa_estoque(db: AsyncSession, product):
+    """create_sale deve decrementar o estoque dos itens vendidos."""
+    items = [ItemInput(
+        product_id=product.id,
+        quantity=2,
+        sale_price=Decimal("50.00"),
+        cost_price=Decimal("20.00"),
+    )]
+    sale = await create_sale(db, user_id=1, items=items)
+
+    await db.refresh(product)
+    assert product.stock == 8
+    assert sale.id is not None
+    assert float(sale.total_amount) == 100.00
+    assert float(sale.total_profit) == 60.00
+
+
+@pytest.mark.asyncio
+async def test_create_sale_estoque_insuficiente_faz_rollback(db: AsyncSession, product):
+    """create_sale deve fazer rollback completo se qualquer item tiver estoque insuficiente."""
+    from fastapi import HTTPException
+    items = [ItemInput(
+        product_id=product.id,
+        quantity=9999,
+        sale_price=Decimal("50.00"),
+        cost_price=Decimal("20.00"),
+    )]
+    with pytest.raises(HTTPException):
+        await create_sale(db, user_id=1, items=items)
+
+    # Estoque não deve ter mudado
+    await db.refresh(product)
+    assert product.stock == 10
+
+
+@pytest.mark.asyncio
+async def test_remove_sale_restaura_estoque(db: AsyncSession, product):
+    """remove_sale deve devolver o estoque de todos os itens da venda."""
+    items = [ItemInput(
+        product_id=product.id,
+        quantity=3,
+        sale_price=Decimal("50.00"),
+        cost_price=Decimal("20.00"),
+    )]
+    sale = await create_sale(db, user_id=1, items=items)
+    await db.refresh(product)
+    assert product.stock == 7
+
+    await remove_sale(db, sale.id)
+    await db.refresh(product)
+    assert product.stock == 10
+
+
+@pytest.mark.asyncio
+async def test_remove_sale_inexistente_levanta_erro(db: AsyncSession):
+    """remove_sale deve levantar para ID de venda que não existe."""
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException):
+        await remove_sale(db, sale_id=99999)
+```
+
+### 3.5.5 — Rodar os testes
+
+```bash
+# Certifique que o banco de testes existe e o servidor está rodando
+uv run pytest tests/ -v
+```
+
+Saída esperada:
+```
+tests/test_stock.py::test_check_stock_suficiente PASSED
+tests/test_stock.py::test_check_stock_insuficiente PASSED
+tests/test_stock.py::test_check_stock_produto_inexistente PASSED
+tests/test_stock.py::test_decrement_stock PASSED
+tests/test_stock.py::test_increment_stock PASSED
+tests/test_sale_service.py::test_create_sale_decrementa_estoque PASSED
+tests/test_sale_service.py::test_create_sale_estoque_insuficiente_faz_rollback PASSED
+tests/test_sale_service.py::test_remove_sale_restaura_estoque PASSED
+tests/test_sale_service.py::test_remove_sale_inexistente_levanta_erro PASSED
+```
+
+**Critério de aceitação da Fase 3.5:** todos os testes de serviço passam. ✓
+
+---
+
 ## Fase 4 — GraphQL (Strawberry)
 
 > No Strawberry, você define os tipos usando classes Python com `@strawberry.type`. O schema GraphQL é gerado automaticamente a partir dessas classes.
@@ -1378,6 +1618,180 @@ mutation {
 
 ---
 
+## Fase 4.6 — Testes das Mutations GraphQL
+
+> Cubra as mutations antes de avançar para upload e frontend. O bug do `selectinload().where()` e os crashes de `scalar_one()` **só aparecem com testes de GraphQL** — não são detectáveis com testes de serviço.
+
+### 4.6.1 — Fixture de usuário autenticado
+
+```python
+# tests/conftest.py — adicione estas fixtures:
+import pytest_asyncio
+from app.models.user import User
+
+
+@pytest_asyncio.fixture
+async def user(db: AsyncSession) -> User:
+    """Usuário de teste ativo."""
+    from fastapi_users.password import PasswordHelper
+    helper = PasswordHelper()
+    u = User(
+        email="teste@insonia.com",
+        username="testusr",
+        hashed_password=helper.hash("senha123"),
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    db.add(u)
+    await db.commit()
+    await db.refresh(u)
+    return u
+
+
+@pytest_asyncio.fixture
+async def auth_client(db: AsyncSession, user: User) -> AsyncClient:
+    """AsyncClient com usuário autenticado via JWT."""
+    from app.core.auth import auth_backend
+    from fastapi_users.jwt import generate_jwt
+
+    token = generate_jwt(
+        {"sub": str(user.id), "aud": ["fastapi-users:auth"]},
+        auth_backend.get_strategy().secret,
+        auth_backend.get_strategy().lifetime_seconds,
+    )
+
+    app.dependency_overrides[get_db] = lambda: db
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as c:
+        yield c
+    app.dependency_overrides.clear()
+```
+
+### 4.6.2 — Testes de mutations
+
+```python
+# tests/test_graphql_mutations.py
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+@pytest.mark.asyncio
+async def test_create_product(auth_client: AsyncClient):
+    """createProduct deve criar o produto e retornar id, name e slug."""
+    response = await auth_client.post("/graphql", json={
+        "query": """
+            mutation {
+                createProduct(input: {
+                    name: "Camiseta Preta"
+                    salePrice: 89.90
+                    costPrice: 35.00
+                    stock: 20
+                }) {
+                    id
+                    name
+                    slug
+                }
+            }
+        """
+    })
+    data = response.json()
+    assert "errors" not in data
+    product = data["data"]["createProduct"]
+    assert product["name"] == "Camiseta Preta"
+    assert product["slug"] == "camiseta-preta"
+    assert product["id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_delete_product_inexistente_retorna_erro_graphql(auth_client: AsyncClient):
+    """deleteProduct com ID inexistente deve retornar erro GraphQL, não 500."""
+    response = await auth_client.post("/graphql", json={
+        "query": "mutation { deleteProduct(id: 999999) }"
+    })
+    data = response.json()
+    assert response.status_code == 200
+    assert "errors" in data
+
+
+@pytest.mark.asyncio
+async def test_create_sale_e_sale_query(auth_client: AsyncClient, product):
+    """Criar venda e depois buscar pelo ID — testa o bug do selectinload().where()."""
+    # Criar venda
+    create_resp = await auth_client.post("/graphql", json={
+        "query": f"""
+            mutation {{
+                createSale(items: [{{ productId: {product.id}, quantity: 1 }}]) {{
+                    id
+                    totalAmount
+                }}
+            }}
+        """
+    })
+    sale_data = create_resp.json()
+    assert "errors" not in sale_data
+    sale_id = sale_data["data"]["createSale"]["id"]
+
+    # Buscar a venda pelo ID
+    get_resp = await auth_client.post("/graphql", json={
+        "query": f"""
+            query {{
+                sale(id: {sale_id}) {{
+                    id
+                    totalAmount
+                    items {{ productId quantity }}
+                }}
+            }}
+        """
+    })
+    get_data = get_resp.json()
+    assert "errors" not in get_data
+    assert get_data["data"]["sale"]["id"] == sale_id
+
+
+@pytest.mark.asyncio
+async def test_create_category_e_update(auth_client: AsyncClient):
+    """Criar e renomear categoria — slug deve ser atualizado."""
+    create_resp = await auth_client.post("/graphql", json={
+        "query": """
+            mutation {
+                createCategory(input: { name: "Calças" }) {
+                    id slug
+                }
+            }
+        """
+    })
+    cat = create_resp.json()["data"]["createCategory"]
+    assert cat["slug"] == "calcas"
+
+    update_resp = await auth_client.post("/graphql", json={
+        "query": f"""
+            mutation {{
+                updateCategory(id: {cat["id"]}, input: {{ name: "Bermudas" }}) {{
+                    id name slug
+                }}
+            }}
+        """
+    })
+    updated = update_resp.json()["data"]["updateCategory"]
+    assert updated["name"] == "Bermudas"
+    assert updated["slug"] == "bermudas"  # slug deve ter atualizado
+```
+
+### 4.6.3 — Rodar
+
+```bash
+uv run pytest tests/test_graphql_mutations.py -v
+```
+
+**Critério de aceitação da Fase 4.6:** mutations básicas passam, bug do `sale` query não aparece. ✓
+
+---
+
 ## Fase 5 — Upload de Imagens
 
 ### 5.1 — Endpoint de upload
@@ -1495,69 +1909,158 @@ const response = await fetch('http://localhost:8000/graphql', {
 
 ---
 
-## Fase 8 — Testes
+## Fase 8 — Testes de Auth e Integração E2E
 
-### 8.1 — Configurar pytest
+> Os testes de serviço estão na Fase 3.5. Os testes de mutations GraphQL estão na Fase 4.6.
+> Aqui cobrimos: fluxo de auth completo, rotas protegidas, e o caminho completo PDV (login → criar produto → criar venda → cancelar venda).
 
-```python
-# tests/conftest.py
-import asyncio
-import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
-from app.core.database import Base, get_db
-from main import app
-
-TEST_DATABASE_URL = "postgresql+asyncpg://insonia:insonia@localhost:5432/insonia_test"
-
-engine_test = create_async_engine(TEST_DATABASE_URL)
-TestSessionLocal = async_sessionmaker(engine_test, expire_on_commit=False)
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def setup_db():
-    """Cria todas as tabelas antes dos testes e derruba ao final da sessão."""
-    async with engine_test.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine_test.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-
-
-@pytest_asyncio.fixture
-async def db():
-    """Fornece uma sessão de banco de dados de teste para cada teste."""
-    async with TestSessionLocal() as session:
-        yield session
-
-
-@pytest_asyncio.fixture
-async def client(db):
-    """Fornece um AsyncClient com a dependência de banco substituída pelo banco de teste."""
-    app.dependency_overrides[get_db] = lambda: db
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-        yield c
-    app.dependency_overrides.clear()
-```
-
-### 8.2 — Exemplo de teste de serviço
+### 8.1 — Testes do fluxo de autenticação
 
 ```python
-# tests/test_stock.py
+# tests/test_auth.py
 import pytest
-from fastapi import HTTPException
-
-from app.services.stock import decrement_stock, check_stock
+from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_insufficient_stock(db, product_fixture):
-    """Garante que check_stock levanta 400 quando a quantidade excede o estoque."""
-    with pytest.raises(HTTPException) as exc:
-        await check_stock(db, product_fixture.id, quantity=9999)
-    assert exc.value.status_code == 400
+async def test_register_e_login(client: AsyncClient):
+    """Registrar e fazer login deve retornar access_token."""
+    # Registrar
+    reg = await client.post("/auth/register", json={
+        "email": "novo@insonia.com",
+        "username": "novousr",
+        "password": "senha123",
+    })
+    assert reg.status_code == 201
+
+    # Login
+    login = await client.post("/auth/login", data={
+        "username": "novo@insonia.com",
+        "password": "senha123",
+    })
+    assert login.status_code == 200
+    assert "access_token" in login.json()
+
+
+@pytest.mark.asyncio
+async def test_rota_protegida_sem_token_retorna_401(client: AsyncClient):
+    """Query GraphQL que requer auth deve retornar 401 sem token."""
+    response = await client.post("/graphql", json={
+        "query": "{ allProducts { id } }"
+    })
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_users_me_com_token(auth_client: AsyncClient):
+    """GET /users/me com token válido deve retornar dados do usuário."""
+    response = await auth_client.get("/users/me")
+    assert response.status_code == 200
+    data = response.json()
+    assert "email" in data
+    assert "username" in data
+
+
+@pytest.mark.asyncio
+async def test_token_invalido_retorna_401(client: AsyncClient):
+    """Token inválido deve retornar 401."""
+    response = await client.get(
+        "/users/me",
+        headers={"Authorization": "Bearer token-falso"}
+    )
+    assert response.status_code == 401
+```
+
+### 8.2 — Teste E2E do caminho completo PDV
+
+```python
+# tests/test_e2e_pdv.py
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+@pytest.mark.asyncio
+async def test_fluxo_completo_pdv(auth_client: AsyncClient, db: AsyncSession):
+    """
+    Caminho crítico do PDV:
+    1. Criar categoria e marca
+    2. Criar produto com estoque
+    3. Criar venda (estoque decrementa)
+    4. Cancelar venda (estoque restaura)
+    """
+    # 1. Criar categoria
+    cat_resp = await auth_client.post("/graphql", json={
+        "query": "mutation { createCategory(input: { name: \"Camisetas\" }) { id } }"
+    })
+    cat_id = cat_resp.json()["data"]["createCategory"]["id"]
+
+    # 2. Criar produto com estoque = 5
+    prod_resp = await auth_client.post("/graphql", json={
+        "query": f"""
+            mutation {{
+                createProduct(input: {{
+                    name: "Camiseta Azul"
+                    salePrice: 79.90
+                    costPrice: 30.00
+                    stock: 5
+                    categoryId: {cat_id}
+                }}) {{ id stock }}
+            }}
+        """
+    })
+    prod = prod_resp.json()["data"]["createProduct"]
+    assert prod["stock"] == 5
+    prod_id = prod["id"]
+
+    # 3. Criar venda de 3 unidades — estoque deve cair para 2
+    sale_resp = await auth_client.post("/graphql", json={
+        "query": f"""
+            mutation {{
+                createSale(items: [{{ productId: {prod_id}, quantity: 3 }}]) {{
+                    id totalAmount
+                }}
+            }}
+        """
+    })
+    sale = sale_resp.json()["data"]["createSale"]
+    assert float(sale["totalAmount"]) == pytest.approx(239.70, rel=1e-2)
+    sale_id = sale["id"]
+
+    # Verificar estoque após venda
+    check_resp = await auth_client.post("/graphql", json={
+        "query": f"{{ product(id: {prod_id}) {{ stock }} }}"
+    })
+    assert check_resp.json()["data"]["product"]["stock"] == 2
+
+    # 4. Cancelar venda — estoque deve voltar para 5
+    del_resp = await auth_client.post("/graphql", json={
+        "query": f"mutation {{ deleteSale(id: {sale_id}) }}"
+    })
+    assert del_resp.json()["data"]["deleteSale"] is True
+
+    check_resp2 = await auth_client.post("/graphql", json={
+        "query": f"{{ product(id: {prod_id}) {{ stock }} }}"
+    })
+    assert check_resp2.json()["data"]["product"]["stock"] == 5
+```
+
+### 8.3 — Rodar toda a suíte
+
+```bash
+uv run pytest tests/ -v --tb=short
+```
+
+Cobertura esperada após todas as fases de teste:
+- Serviços: check_stock, decrement_stock, increment_stock, create_sale, remove_sale
+- GraphQL: createProduct, deleteProduct, createCategory, updateCategory, createSale, sale query
+- Auth: register, login, rotas protegidas, token inválido
+- E2E: fluxo completo PDV com verificação de estoque
+
+```bash
+# Para ver cobertura de código:
+uv add --dev pytest-cov
+uv run pytest tests/ --cov=app --cov-report=term-missing
 ```
 
 ---
