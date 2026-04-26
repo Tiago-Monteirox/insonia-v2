@@ -3,14 +3,18 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from strawberry.fastapi import GraphQLRouter
 
+from app.core.auth import current_active_user
 from app.core.database import get_db
 from app.graphql.mutations import Mutation
 from app.graphql.queries import Query
 
 
-async def get_context(db: AsyncSession = Depends(get_db)) -> dict:
+async def get_context(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_active_user),
+) -> dict:
     """Monta o contexto injetado em cada resolver GraphQL."""
-    return {"db": db}
+    return {"db": db, "user": user}
 
 
 schema = strawberry.Schema(query=Query, mutation=Mutation)
