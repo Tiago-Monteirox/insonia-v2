@@ -1006,6 +1006,370 @@ Após subir, acesse `http://localhost:8000/graphql` para o GraphiQL (interface i
 
 ---
 
+## Fase 4.5 — Expansão do Schema GraphQL
+
+> Objetivo: cobrir o domínio inteiro antes de avançar para features de suporte (upload, deploy). Com isso o frontend pode ser wired up sem depender de contratos instáveis.
+
+### 4.5.1 — Autenticação no contexto GraphQL
+
+A mutation `createSale` já usa `info.context["user"]`, mas o `get_context` ainda não injeta o usuário. Atualize `app/graphql/schema.py`:
+
+```python
+# app/graphql/schema.py
+from fastapi import Depends
+import strawberry
+from strawberry.fastapi import GraphQLRouter
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.auth import current_active_user
+from app.core.database import get_db
+from app.graphql.queries import Query
+from app.graphql.mutations import Mutation
+
+
+async def get_context(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(current_active_user),
+) -> dict:
+    """Monta o contexto injetado em cada resolver GraphQL."""
+    return {"db": db, "user": user}
+
+
+schema = strawberry.Schema(query=Query, mutation=Mutation)
+graphql_app = GraphQLRouter(schema, context_getter=get_context)
+```
+
+> **Atenção:** com isso todas as queries GraphQL passam a exigir JWT. Se quiser queries públicas (ex: listar produtos na vitrine), separe o context_getter ou use `current_active_user(optional=True)`.
+
+### 4.5.2 — Novos tipos em `app/graphql/types.py`
+
+Adicione os tipos para vendas e variações:
+
+```python
+# Adicionar ao final de app/graphql/types.py
+import strawberry
+from datetime import datetime
+
+
+@strawberry.type
+class SaleItemType:
+    """Tipo GraphQL para um item dentro de uma venda."""
+
+    id: int
+    product_id: int
+    quantity: int
+    sale_price: MoneyType
+    cost_price: MoneyType
+
+
+@strawberry.type
+class SaleType:
+    """Tipo GraphQL para uma venda com seus itens."""
+
+    id: int
+    user_id: int
+    sale_date: datetime
+    total_amount: float
+    total_profit: float
+    items: list[SaleItemType]
+
+
+@strawberry.type
+class VariationNameType:
+    """Tipo GraphQL para nome de atributo de variação."""
+
+    id: int
+    name: str
+
+
+@strawberry.type
+class VariationValueType:
+    """Tipo GraphQL para valor concreto de um atributo de variação."""
+
+    id: int
+    value: str
+    variation_name: VariationNameType
+```
+
+### 4.5.3 — Inputs para mutations de produto, categoria e marca
+
+```python
+# app/graphql/inputs.py
+import strawberry
+
+
+@strawberry.input
+class ProductInput:
+    """Input para criação ou atualização de produto."""
+
+    name: str
+    sale_price: float
+    cost_price: float
+    stock: int = 0
+    description: str | None = None
+    promotional_price: float | None = None
+    currency: str = "BRL"
+    category_id: int | None = None
+    brand_id: int | None = None
+
+
+@strawberry.input
+class CategoryInput:
+    """Input para criação ou atualização de categoria."""
+
+    name: str
+
+
+@strawberry.input
+class BrandInput:
+    """Input para criação ou atualização de marca."""
+
+    name: str
+```
+
+### 4.5.4 — Expandir queries em `app/graphql/queries.py`
+
+```python
+# Adicionar ao final da classe Query em app/graphql/queries.py
+from app.graphql.types import BrandType, SaleType, SaleItemType, MoneyType
+from app.models.brand import Brand
+from app.models.sale import Sale, SaleItem
+from sqlalchemy.orm import selectinload
+
+    @strawberry.field
+    async def all_brands(self, info: Info) -> list[BrandType]:
+        """Retorna todas as marcas cadastradas."""
+        db = info.context["db"]
+        result = await db.execute(select(Brand))
+        rows = result.scalars().all()
+        return [BrandType(id=r.id, name=r.name, slug=r.slug) for r in rows]
+
+    @strawberry.field
+    async def brand(self, info: Info, id: int) -> BrandType | None:
+        """Retorna uma marca pelo ID, ou None se não encontrada."""
+        db = info.context["db"]
+        result = await db.execute(select(Brand).where(Brand.id == id))
+        r = result.scalar_one_or_none()
+        return BrandType(id=r.id, name=r.name, slug=r.slug) if r else None
+
+    @strawberry.field
+    async def all_sales(self, info: Info) -> list[SaleType]:
+        """Retorna todas as vendas com seus itens."""
+        db = info.context["db"]
+        result = await db.execute(
+            select(Sale).options(selectinload(Sale.items))
+        )
+        return [sale_model_to_type(s) for s in result.scalars()]
+
+    @strawberry.field
+    async def sale(self, info: Info, id: int) -> SaleType | None:
+        """Retorna uma venda pelo ID com seus itens, ou None se não encontrada."""
+        db = info.context["db"]
+        result = await db.execute(
+            select(Sale).options(selectinload(Sale.items)).where(Sale.id == id)
+        )
+        s = result.scalar_one_or_none()
+        return sale_model_to_type(s) if s else None
+```
+
+Adicione a função auxiliar de conversão antes da classe `Query`:
+
+```python
+def sale_model_to_type(s: Sale) -> SaleType:
+    """Converte um modelo ORM de venda para o tipo GraphQL correspondente."""
+    return SaleType(
+        id=s.id,
+        user_id=s.user_id,
+        sale_date=s.sale_date,
+        total_amount=float(s.total_amount),
+        total_profit=float(s.total_profit),
+        items=[
+            SaleItemType(
+                id=item.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                sale_price=MoneyType(amount=float(item.sale_price), currency="BRL"),
+                cost_price=MoneyType(amount=float(item.cost_price), currency="BRL"),
+            )
+            for item in s.items
+        ],
+    )
+```
+
+### 4.5.5 — Expandir mutations em `app/graphql/mutations.py`
+
+```python
+# Adicionar à classe Mutation em app/graphql/mutations.py
+from decimal import Decimal
+from app.graphql.inputs import ProductInput, CategoryInput, BrandInput
+from app.graphql.types import CategoryType, BrandType
+from app.models.product import Product
+from app.models.category import Category
+from app.models.brand import Brand
+from app.models.sale import Sale
+from app.services.stock import increment_stock
+from slugify import slugify
+
+    # --- Produto ---
+
+    @strawberry.mutation
+    async def create_product(self, info: Info, input: ProductInput) -> ProductType:
+        """Cria um novo produto com os dados informados."""
+        db = info.context["db"]
+        product = Product(
+            name=input.name,
+            sale_price=Decimal(str(input.sale_price)),
+            cost_price=Decimal(str(input.cost_price)),
+            stock=input.stock,
+            description=input.description,
+            promotional_price=Decimal(str(input.promotional_price)) if input.promotional_price else None,
+            currency=input.currency,
+            category_id=input.category_id,
+            brand_id=input.brand_id,
+        )
+        db.add(product)
+        await db.commit()
+        await db.refresh(product)
+        return product_model_to_type(product)
+
+    @strawberry.mutation
+    async def update_product(self, info: Info, id: int, input: ProductInput) -> ProductType:
+        """Atualiza os dados de um produto existente."""
+        db = info.context["db"]
+        result = await db.execute(select(Product).where(Product.id == id))
+        product = result.scalar_one()
+        product.name = input.name
+        product.sale_price = Decimal(str(input.sale_price))
+        product.cost_price = Decimal(str(input.cost_price))
+        product.stock = input.stock
+        product.description = input.description
+        product.promotional_price = Decimal(str(input.promotional_price)) if input.promotional_price else None
+        product.currency = input.currency
+        product.category_id = input.category_id
+        product.brand_id = input.brand_id
+        product.slug = slugify(input.name)
+        await db.commit()
+        await db.refresh(product)
+        return product_model_to_type(product)
+
+    @strawberry.mutation
+    async def delete_product(self, info: Info, id: int) -> bool:
+        """Remove um produto pelo ID. Retorna True se deletado com sucesso."""
+        db = info.context["db"]
+        result = await db.execute(select(Product).where(Product.id == id))
+        product = result.scalar_one()
+        await db.delete(product)
+        await db.commit()
+        return True
+
+    # --- Categoria ---
+
+    @strawberry.mutation
+    async def create_category(self, info: Info, input: CategoryInput) -> CategoryType:
+        """Cria uma nova categoria."""
+        db = info.context["db"]
+        category = Category(name=input.name)
+        db.add(category)
+        await db.commit()
+        await db.refresh(category)
+        return CategoryType(id=category.id, name=category.name, slug=category.slug)
+
+    @strawberry.mutation
+    async def delete_category(self, info: Info, id: int) -> bool:
+        """Remove uma categoria pelo ID. Retorna True se deletada com sucesso."""
+        db = info.context["db"]
+        result = await db.execute(select(Category).where(Category.id == id))
+        category = result.scalar_one()
+        await db.delete(category)
+        await db.commit()
+        return True
+
+    # --- Marca ---
+
+    @strawberry.mutation
+    async def create_brand(self, info: Info, input: BrandInput) -> BrandType:
+        """Cria uma nova marca."""
+        db = info.context["db"]
+        brand = Brand(name=input.name)
+        db.add(brand)
+        await db.commit()
+        await db.refresh(brand)
+        return BrandType(id=brand.id, name=brand.name, slug=brand.slug)
+
+    @strawberry.mutation
+    async def delete_brand(self, info: Info, id: int) -> bool:
+        """Remove uma marca pelo ID. Retorna True se deletada com sucesso."""
+        db = info.context["db"]
+        result = await db.execute(select(Brand).where(Brand.id == id))
+        brand = result.scalar_one()
+        await db.delete(brand)
+        await db.commit()
+        return True
+
+    # --- Venda ---
+
+    @strawberry.mutation
+    async def delete_sale(self, info: Info, id: int) -> bool:
+        """Remove uma venda e restaura o estoque de todos os seus itens."""
+        db = info.context["db"]
+        from app.services.sale import remove_sale
+        await remove_sale(db, id)
+        return True
+```
+
+### 4.5.6 — Exemplos de uso após expansão
+
+```graphql
+# Criar produto
+mutation {
+  createProduct(input: {
+    name: "Camiseta Preta M"
+    salePrice: 89.90
+    costPrice: 35.00
+    stock: 50
+    categoryId: 1
+    brandId: 1
+  }) {
+    id
+    name
+    slug
+    salePrice { amount currency }
+  }
+}
+```
+
+```graphql
+# Histórico de vendas
+query {
+  allSales {
+    id
+    saleDate
+    totalAmount
+    totalProfit
+    items {
+      productId
+      quantity
+      salePrice { amount currency }
+    }
+  }
+}
+```
+
+```graphql
+# Criar categoria
+mutation {
+  createCategory(input: { name: "Camisetas" }) {
+    id
+    name
+    slug
+  }
+}
+```
+
+**Critério de aceitação da Fase 4.5:** domínio completo acessível via GraphQL — CRUD de produto, categoria e marca, histórico de vendas. ✓
+
+---
+
 ## Fase 5 — Upload de Imagens
 
 ### 5.1 — Endpoint de upload
