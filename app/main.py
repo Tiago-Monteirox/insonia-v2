@@ -2,8 +2,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.auth import auth_backend, fastapi_users
+from app.graphql.schema import graphql_app
 from app.schemas.user import UserCreate, UserRead, UserUpdate
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,4 +38,5 @@ app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
     prefix="/users",
     tags=["users"],
-)   
+)
+app.include_router(graphql_app, prefix="/graphql")
