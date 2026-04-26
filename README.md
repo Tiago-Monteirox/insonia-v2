@@ -2,19 +2,23 @@
 
 Reconstrucao do backend do Insonia com FastAPI, SQLAlchemy async, PostgreSQL e Strawberry GraphQL.
 
-O frontend ja existe em [`insonia-frontend/`](./insonia-frontend). No backend, o projeto ja saiu do estado de "somente infra" e agora conta com a base de modelagem do dominio e a migration inicial do banco. Ainda assim, a aplicacao exposta continua minima: por enquanto so existe o `healthcheck`, e as camadas de auth, servicos, GraphQL e integracao com o frontend ainda nao foram conectadas.
+O frontend ja existe em [`insonia-frontend/`](./insonia-frontend). No backend, o projeto ja saiu do estado de "somente infra" e agora conta com modelagem inicial do dominio, migration inicial, autenticacao JWT via `fastapi-users`, servicos de estoque e venda e um schema GraphQL montado no FastAPI.
 
 ## Estado atual
 
 Hoje o projeto entrega:
 
 - estrutura base do backend em `app/`
-- aplicacao FastAPI inicial em [`app/main.py`](./app/main.py)
+- aplicacao FastAPI com auth e GraphQL em [`app/main.py`](./app/main.py)
 - endpoint `GET /health`
 - configuracao central via `.env` em [`app/core/config.py`](./app/core/config.py)
 - engine e session factory async do SQLAlchemy em [`app/core/database.py`](./app/core/database.py)
 - modelos SQLAlchemy do dominio em [`app/models/`](./app/models)
 - geracao automatica de slug para entidades com nome
+- autenticacao JWT com `fastapi-users` em [`app/core/auth.py`](./app/core/auth.py)
+- schemas de usuario em [`app/schemas/user.py`](./app/schemas/user.py)
+- schema GraphQL com queries e mutations em [`app/graphql/`](./app/graphql)
+- servicos de estoque e venda em [`app/services/`](./app/services)
 - setup do Alembic em [`alembic.ini`](./alembic.ini) e [`migrations/`](./migrations)
 - migration inicial do schema em [`migrations/versions/37d9af481f87_initial.py`](./migrations/versions/37d9af481f87_initial.py)
 - PostgreSQL local via [`docker-compose.yml`](./docker-compose.yml)
@@ -22,12 +26,11 @@ Hoje o projeto entrega:
 
 Hoje o projeto ainda nao entrega:
 
-- fluxo de autenticacao exposto na API
 - endpoints REST de dominio
-- schema GraphQL
-- regras de negocio em `services`
 - testes
 - integracao real com o frontend
+- cobertura completa de dominio no GraphQL
+- wiring completo de autenticacao dentro dos resolvers GraphQL
 
 ## Stack prevista
 
@@ -48,9 +51,14 @@ O direcionamento completo das proximas fases esta em [`ROADMAP.md`](./ROADMAP.md
 insonia-v2/
 ├── app/
 │   ├── core/
+│   │   ├── auth.py
 │   │   ├── config.py
 │   │   └── database.py
 │   ├── graphql/
+│   │   ├── mutations.py
+│   │   ├── queries.py
+│   │   ├── schema.py
+│   │   └── types.py
 │   ├── models/
 │   │   ├── brand.py
 │   │   ├── category.py
@@ -61,7 +69,10 @@ insonia-v2/
 │   │   └── variation.py
 │   ├── routers/
 │   ├── schemas/
+│   │   └── user.py
 │   ├── services/
+│   │   ├── sale.py
+│   │   └── stock.py
 │   └── main.py
 ├── migrations/
 │   └── versions/
@@ -75,7 +86,7 @@ insonia-v2/
 └── uv.lock
 ```
 
-As pastas `graphql`, `routers`, `schemas` e `services` ainda estao reservadas para as proximas fases. O bloco mais avancado do backend hoje esta em `models` e `migrations`.
+As pastas `routers` ainda estao praticamente reservadas para as proximas fases. Hoje, os blocos mais avancados do backend estao em `models`, `migrations`, `core/auth`, `graphql` e `services`.
 
 ## Modelos ja implementados
 
@@ -90,7 +101,41 @@ As pastas `graphql`, `routers`, `schemas` e `services` ainda estao reservadas pa
 - `SaleItem`
 - `User`
 
-O modelo `User` ja usa a base do `fastapi-users`, mas o fluxo de autenticacao ainda nao foi exposto em rotas.
+O modelo `User` usa a base do `fastapi-users` e ja esta conectado as rotas de autenticacao da API.
+
+## Autenticacao
+
+A autenticacao ja esta montada com `fastapi-users` e backend JWT bearer.
+
+Rotas atualmente registradas:
+
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /users/me`
+- `PATCH /users/me`
+- `GET /users/{id}`
+
+O backend usa:
+
+- `JWTStrategy` com `SECRET_KEY`
+- expiracao configurada por `JWT_LIFETIME_SECONDS`
+- modelo `User` baseado em `SQLAlchemyBaseUserTable[int]`
+- schemas `UserRead`, `UserCreate` e `UserUpdate`
+
+## GraphQL
+
+O endpoint GraphQL ja esta montado em:
+
+- `POST /graphql`
+
+Schema atual:
+
+- queries `allProducts`, `product(id)` e `allCategories`
+- mutation `createSale(items)`
+- tipos `MoneyType`, `CategoryType`, `BrandType` e `ProductType`
+
+O schema usa `Strawberry` com `GraphQLRouter` e injeta a sessao async do banco no contexto.
 
 ## Banco de dados e migrations
 
@@ -101,6 +146,18 @@ O projeto ja possui:
 - Alembic configurado para ler `DATABASE_URL`
 - import dos modelos em `migrations/env.py` para autogenerate
 - migration inicial criando as tabelas do dominio
+
+## Servicos de negocio
+
+Ja existem servicos iniciais para:
+
+- validacao de estoque
+- decremento de estoque
+- incremento de estoque
+- criacao atomica de venda
+- remocao de venda com reposicao de estoque
+
+Essas regras hoje vivem em [`app/services/stock.py`](./app/services/stock.py) e [`app/services/sale.py`](./app/services/sale.py).
 
 Tabelas previstas na migration inicial:
 
@@ -166,6 +223,7 @@ API disponivel em:
 - `http://localhost:8000/health`
 - `http://localhost:8000/docs`
 - `http://localhost:8000/redoc`
+- `http://localhost:8000/graphql`
 
 ## Endpoints disponiveis hoje
 
@@ -177,30 +235,56 @@ Retorna:
 {"status":"ok"}
 ```
 
+### Auth
+
+- `POST /auth/register`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /users/me`
+- `PATCH /users/me`
+- `GET /users/{id}`
+
+### GraphQL
+
+Endpoint:
+
+```text
+/graphql
+```
+
+Queries disponiveis hoje:
+
+- `allProducts`
+- `product(id)`
+- `allCategories`
+
+Mutation disponivel hoje:
+
+- `createSale(items)`
+
 ## O que ainda esta pendente
 
 - registrar routers reais no FastAPI
-- expor auth com `fastapi-users`
-- implementar schema e resolvers GraphQL
-- criar schemas Pydantic
-- mover regras de negocio para `app/services`
 - adicionar testes
 - conectar o frontend existente ao backend
+- expandir queries e mutations para cobrir o dominio inteiro
+- integrar auth de forma completa dentro do fluxo GraphQL
+- expor REST de negocio, caso essa camada seja mantida
 
 ## Observacoes importantes
 
 - O ponto de entrada da API hoje e `app.main:app`.
 - O arquivo [`main.py`](./main.py) na raiz e apenas o placeholder gerado no setup inicial e nao e o entrypoint do servidor FastAPI.
 - O `docker-compose.yml` atual sobe somente o banco PostgreSQL.
-- Embora os modelos e a migration inicial existam, a aplicacao ainda nao usa esses modelos em rotas reais.
+- Auth e GraphQL ja estao montados, mas a cobertura funcional ainda e parcial.
 - O frontend em `insonia-frontend/` ainda nao esta conectado a este backend.
 
 ## Proximos passos
 
 Seguindo o estado atual do repositorio, a sequencia natural agora e:
 
-1. expor autenticacao e dependencia de usuario atual
-2. criar services de negocio para produto, estoque e venda
-3. montar queries e mutations GraphQL
-4. adicionar testes para models, migrations e regras de negocio
+1. expandir o schema GraphQL para marcas, vendas, historico e operacoes de produto
+2. fortalecer o fluxo autenticado dentro dos resolvers e mutations
+3. adicionar testes para auth, services e GraphQL
+4. decidir se a camada REST de dominio sera mantida ou se o backend sera GraphQL-first
 5. conectar o frontend existente ao backend
