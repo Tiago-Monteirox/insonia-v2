@@ -1,176 +1,99 @@
 # Insonia v2
 
-Reconstrucao do backend do Insonia com FastAPI, SQLAlchemy async, PostgreSQL e Strawberry GraphQL.
+Reconstrução do backend do Insonia com FastAPI, SQLAlchemy async, PostgreSQL e Strawberry GraphQL.
 
-O frontend ja existe em [`insonia-frontend/`](./insonia-frontend). No backend, o projeto ja saiu do estado de "somente infra" e agora conta com modelagem inicial do dominio, migration inicial, autenticacao JWT via `fastapi-users`, servicos de estoque e venda e um schema GraphQL montado no FastAPI.
+O frontend já existe em [`insonia-frontend/`](./insonia-frontend). O backend saiu do estado de infra e hoje entrega
+autenticação JWT, domínio completo de produtos/categorias/marcas/vendas via GraphQL, serviços de estoque com
+atomicidade e um schema GraphQL completo montado no FastAPI.
+
+Antes de avançar para as próximas fases, leia [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) — ele lista bugs conhecidos,
+dívida técnica e issues de segurança a corrigir primeiro.
 
 ## Estado atual
 
-Hoje o projeto entrega:
+O projeto entrega hoje:
 
-- estrutura base do backend em `app/`
-- aplicacao FastAPI com auth e GraphQL em [`app/main.py`](./app/main.py)
+- aplicação FastAPI com auth e GraphQL em [`app/main.py`](./app/main.py)
 - endpoint `GET /health`
-- configuracao central via `.env` em [`app/core/config.py`](./app/core/config.py)
+- configuração central via `.env` em [`app/core/config.py`](./app/core/config.py)
 - engine e session factory async do SQLAlchemy em [`app/core/database.py`](./app/core/database.py)
-- modelos SQLAlchemy do dominio em [`app/models/`](./app/models)
-- geracao automatica de slug para entidades com nome
-- autenticacao JWT com `fastapi-users` em [`app/core/auth.py`](./app/core/auth.py)
-- schemas de usuario em [`app/schemas/user.py`](./app/schemas/user.py)
-- schema GraphQL com queries e mutations em [`app/graphql/`](./app/graphql)
-- servicos de estoque e venda em [`app/services/`](./app/services)
+- modelos SQLAlchemy do domínio completo em [`app/models/`](./app/models)
+- geração automática de slug para entidades com nome via `SlugMixin`
+- autenticação JWT com `fastapi-users` em [`app/core/auth.py`](./app/core/auth.py)
+- usuário autenticado injetado no contexto de cada resolver GraphQL
+- schema GraphQL com CRUD completo de produto, categoria, marca e venda em [`app/graphql/`](./app/graphql)
+- inputs tipados para mutations em [`app/graphql/inputs.py`](./app/graphql/inputs.py)
+- serviços de estoque e venda em [`app/services/`](./app/services)
 - setup do Alembic em [`alembic.ini`](./alembic.ini) e [`migrations/`](./migrations)
-- migration inicial do schema em [`migrations/versions/37d9af481f87_initial.py`](./migrations/versions/37d9af481f87_initial.py)
 - PostgreSQL local via [`docker-compose.yml`](./docker-compose.yml)
-- dependencias gerenciadas com `uv`
+- dependências gerenciadas com `uv`
 
-Hoje o projeto ainda nao entrega:
+O projeto ainda não entrega:
 
-- endpoints REST de dominio
-- testes
-- integracao real com o frontend
-- cobertura completa de dominio no GraphQL
-- wiring completo de autenticacao dentro dos resolvers GraphQL
+- testes (veja Fase 3.5 e 4.6 em [`IMPL_GUIDE.md`](./IMPL_GUIDE.md))
+- paginação nas queries de lista
+- CORS configurado
+- upload de imagens (Fase 5)
+- integração real com o frontend (Fase 6)
 
-## Stack prevista
+## Stack
 
-- FastAPI
-- SQLAlchemy 2.x async
-- PostgreSQL
-- Strawberry GraphQL
-- FastAPI Users
-- Pydantic v2
-- Alembic
-- `uv`
+| Camada | Tecnologia |
+|--------|-----------|
+| Framework web | FastAPI |
+| ORM | SQLAlchemy 2.x async |
+| Banco de dados | PostgreSQL 16 |
+| GraphQL | Strawberry |
+| Auth | fastapi-users + JWT |
+| Validação | Pydantic v2 |
+| Migrations | Alembic |
+| Gerenciador de pacotes | uv |
 
-O direcionamento completo das proximas fases esta em [`ROADMAP.md`](./ROADMAP.md) e o passo a passo de implementacao esta em [`IMPL_GUIDE.md`](./IMPL_GUIDE.md).
-
-## Estrutura atual
+## Estrutura
 
 ```text
 insonia-v2/
 ├── app/
 │   ├── core/
-│   │   ├── auth.py
-│   │   ├── config.py
-│   │   └── database.py
+│   │   ├── auth.py          # fastapi-users, JWT strategy
+│   │   ├── config.py        # variáveis de ambiente via python-decouple
+│   │   └── database.py      # engine async, session factory, Base
 │   ├── graphql/
-│   │   ├── mutations.py
-│   │   ├── queries.py
-│   │   ├── schema.py
-│   │   └── types.py
+│   │   ├── inputs.py        # ProductInput, CategoryInput, BrandInput
+│   │   ├── mutations.py     # CRUD de produto, categoria, marca, venda
+│   │   ├── queries.py       # queries de listagem e busca por ID
+│   │   ├── schema.py        # montagem do schema + contexto (db, user)
+│   │   └── types.py         # tipos GraphQL do domínio
 │   ├── models/
 │   │   ├── brand.py
 │   │   ├── category.py
-│   │   ├── mixins.py
-│   │   ├── product.py
-│   │   ├── sale.py
+│   │   ├── mixins.py        # SlugMixin (auto-slug via eventos SQLAlchemy)
+│   │   ├── product.py       # Product + ProductImage
+│   │   ├── sale.py          # Sale + SaleItem
 │   │   ├── user.py
-│   │   └── variation.py
-│   ├── routers/
+│   │   └── variation.py     # VariationName, VariationValue, Variation
+│   ├── routers/             # reservado para Fase 5+ (upload, etc.)
 │   ├── schemas/
-│   │   └── user.py
+│   │   └── user.py          # UserRead, UserCreate, UserUpdate
 │   ├── services/
-│   │   ├── sale.py
-│   │   └── stock.py
-│   └── main.py
+│   │   ├── sale.py          # create_sale (atômico), remove_sale
+│   │   └── stock.py         # check_stock, decrement_stock, increment_stock
+│   └── main.py              # entrypoint da API
 ├── migrations/
 │   └── versions/
-│       └── 37d9af481f87_initial.py
+│       ├── 37d9af481f87_initial.py
+│       └── c57cdf359e3d_add_users_table.py
+├── tests/                   # vazio — a implementar (veja IMPL_GUIDE.md Fase 3.5)
+├── .planning/
+│   └── codebase/            # mapa do codebase gerado por análise estática
 ├── alembic.ini
-├── insonia-frontend/
 ├── docker-compose.yml
-├── IMPL_GUIDE.md
-├── ROADMAP.md
+├── FIXES_GUIDE.md           # bugs e dívida técnica a corrigir antes de avançar
+├── IMPL_GUIDE.md            # passo a passo completo de implementação
+├── ROADMAP.md               # fases do projeto
 ├── pyproject.toml
 └── uv.lock
 ```
-
-As pastas `routers` ainda estao praticamente reservadas para as proximas fases. Hoje, os blocos mais avancados do backend estao em `models`, `migrations`, `core/auth`, `graphql` e `services`.
-
-## Modelos ja implementados
-
-- `Category`
-- `Brand`
-- `Product`
-- `ProductImage`
-- `VariationName`
-- `VariationValue`
-- `Variation`
-- `Sale`
-- `SaleItem`
-- `User`
-
-O modelo `User` usa a base do `fastapi-users` e ja esta conectado as rotas de autenticacao da API.
-
-## Autenticacao
-
-A autenticacao ja esta montada com `fastapi-users` e backend JWT bearer.
-
-Rotas atualmente registradas:
-
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/logout`
-- `GET /users/me`
-- `PATCH /users/me`
-- `GET /users/{id}`
-
-O backend usa:
-
-- `JWTStrategy` com `SECRET_KEY`
-- expiracao configurada por `JWT_LIFETIME_SECONDS`
-- modelo `User` baseado em `SQLAlchemyBaseUserTable[int]`
-- schemas `UserRead`, `UserCreate` e `UserUpdate`
-
-## GraphQL
-
-O endpoint GraphQL ja esta montado em:
-
-- `POST /graphql`
-
-Schema atual:
-
-- queries `allProducts`, `product(id)` e `allCategories`
-- mutation `createSale(items)`
-- tipos `MoneyType`, `CategoryType`, `BrandType` e `ProductType`
-
-O schema usa `Strawberry` com `GraphQLRouter` e injeta a sessao async do banco no contexto.
-
-## Banco de dados e migrations
-
-O projeto ja possui:
-
-- engine async com SQLAlchemy 2.x
-- metadata centralizada em `Base`
-- Alembic configurado para ler `DATABASE_URL`
-- import dos modelos em `migrations/env.py` para autogenerate
-- migration inicial criando as tabelas do dominio
-
-## Servicos de negocio
-
-Ja existem servicos iniciais para:
-
-- validacao de estoque
-- decremento de estoque
-- incremento de estoque
-- criacao atomica de venda
-- remocao de venda com reposicao de estoque
-
-Essas regras hoje vivem em [`app/services/stock.py`](./app/services/stock.py) e [`app/services/sale.py`](./app/services/sale.py).
-
-Tabelas previstas na migration inicial:
-
-- `categorias`
-- `marcas`
-- `produtos`
-- `produto_imagens`
-- `nome_variacoes`
-- `valor_variacoes`
-- `variacoes`
-- `users`
-- `vendas`
-- `itens_venda`
 
 ## Requisitos
 
@@ -178,9 +101,31 @@ Tabelas previstas na migration inicial:
 - `uv`
 - Docker e Docker Compose
 
-## Variaveis de ambiente
+## Como rodar
 
-Existe um `.env` local no projeto. Para subir o backend e rodar migrations, ele precisa conter pelo menos:
+```bash
+# 1. Subir o PostgreSQL
+docker compose up -d db
+
+# 2. Instalar dependências
+uv sync
+
+# 3. Aplicar migrations
+uv run alembic upgrade head
+
+# 4. Subir a API
+uv run uvicorn app.main:app --reload
+```
+
+API disponível em:
+
+- `http://localhost:8000/health`
+- `http://localhost:8000/docs`
+- `http://localhost:8000/graphql`
+
+## Variáveis de ambiente
+
+Crie um `.env` na raiz com:
 
 ```env
 DATABASE_URL=postgresql+asyncpg://insonia:insonia@localhost:5432/insonia
@@ -190,101 +135,136 @@ JWT_LIFETIME_SECONDS=3600
 MAX_IMAGE_SIZE_MB=5
 ```
 
-Observacao importante: `DEBUG` precisa ser um booleano valido para o `python-decouple`, como `True` ou `False`.
+`DEBUG` deve ser `True` ou `False` (booleano válido para o `python-decouple`).
 
-## Como rodar
+## Autenticação
 
-### 1. Subir o PostgreSQL
+Rotas geradas automaticamente pelo `fastapi-users`:
 
-```bash
-docker compose up -d db
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| POST | `/auth/register` | Cadastro de novo usuário |
+| POST | `/auth/login` | Login — retorna JWT |
+| POST | `/auth/logout` | Logout |
+| GET | `/users/me` | Dados do usuário logado |
+| PATCH | `/users/me` | Atualizar perfil |
+| GET | `/users/{id}` | Buscar usuário por ID |
+
+O token JWT deve ser enviado no header `Authorization: Bearer <token>` em todas as requests autenticadas,
+incluindo as queries e mutations GraphQL.
+
+## GraphQL
+
+Endpoint: `POST /graphql` — interface interativa em `http://localhost:8000/graphql`
+
+### Queries
+
+| Query | Descrição |
+|-------|-----------|
+| `allProducts(limit, offset)` | Lista produtos |
+| `product(id)` | Busca produto por ID |
+| `allCategories` | Lista categorias |
+| `category(id)` | Busca categoria por ID |
+| `allBrands` | Lista marcas |
+| `brand(id)` | Busca marca por ID |
+| `allSales` | Lista vendas do usuário autenticado |
+| `sale(id)` | Busca venda por ID |
+
+### Mutations
+
+| Mutation | Descrição |
+|----------|-----------|
+| `createProduct(input)` | Cria produto |
+| `updateProduct(id, input)` | Atualiza produto |
+| `deleteProduct(id)` | Remove produto |
+| `createCategory(input)` | Cria categoria |
+| `deleteCategory(id)` | Remove categoria |
+| `createBrand(input)` | Cria marca |
+| `deleteBrand(id)` | Remove marca |
+| `createSale(items)` | Cria venda (decrementa estoque atomicamente) |
+| `deleteSale(id)` | Cancela venda (restaura estoque) |
+
+### Exemplo rápido
+
+```graphql
+# Criar produto
+mutation {
+  createProduct(input: {
+    name: "Camiseta Preta M"
+    salePrice: 89.90
+    costPrice: 35.00
+    stock: 50
+  }) {
+    id name slug salePrice { amount currency }
+  }
+}
+
+# Registrar venda
+mutation {
+  createSale(items: [{ productId: 1, quantity: 2 }]) {
+    id totalAmount totalProfit
+  }
+}
 ```
 
-### 2. Instalar as dependencias
+## Serviços de negócio
+
+A camada de serviços em `app/services/` contém as regras críticas do domínio:
+
+- **`create_sale`** — verifica estoque, decrementa e persiste todos os itens dentro de uma única transação.
+  Se qualquer item falhar, a venda inteira é revertida.
+- **`remove_sale`** — cancela a venda e restaura o estoque de cada item.
+- **`check_stock`** / **`decrement_stock`** / **`increment_stock`** — operações individuais de estoque.
+
+> Atenção: há uma race condition conhecida no check/decrement de estoque em requisições simultâneas.
+> A correção está documentada em [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) seção 1.3.
+
+## Banco de dados
+
+Tabelas criadas pelas migrations:
+
+| Tabela | Modelo |
+|--------|--------|
+| `users` | `User` |
+| `categorias` | `Category` |
+| `marcas` | `Brand` |
+| `produtos` | `Product` |
+| `produto_imagens` | `ProductImage` |
+| `nome_variacoes` | `VariationName` |
+| `valor_variacoes` | `VariationValue` |
+| `variacoes` | `Variation` |
+| `vendas` | `Sale` |
+| `itens_venda` | `SaleItem` |
+
+Comandos úteis:
 
 ```bash
-uv sync
-```
+# Nova migration
+uv run alembic revision --autogenerate -m "descricao"
 
-### 3. Aplicar as migrations
-
-```bash
+# Aplicar
 uv run alembic upgrade head
+
+# Reverter última
+uv run alembic downgrade -1
+
+# Ver estado atual
+uv run alembic current
 ```
 
-### 4. Subir a API
+## Documentação
 
-```bash
-uv run uvicorn app.main:app --reload
-```
+| Arquivo | Conteúdo |
+|---------|----------|
+| [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) | Bugs, dívida técnica e segurança a corrigir antes de avançar |
+| [`IMPL_GUIDE.md`](./IMPL_GUIDE.md) | Passo a passo completo de implementação de cada fase |
+| [`ROADMAP.md`](./ROADMAP.md) | Visão geral das fases do projeto |
+| [`.planning/codebase/`](./.planning/codebase/) | Mapa do codebase (stack, arquitetura, convenções, concerns) |
 
-API disponivel em:
+## Próximos passos
 
-- `http://localhost:8000/health`
-- `http://localhost:8000/docs`
-- `http://localhost:8000/redoc`
-- `http://localhost:8000/graphql`
-
-## Endpoints disponiveis hoje
-
-### `GET /health`
-
-Retorna:
-
-```json
-{"status":"ok"}
-```
-
-### Auth
-
-- `POST /auth/register`
-- `POST /auth/login`
-- `POST /auth/logout`
-- `GET /users/me`
-- `PATCH /users/me`
-- `GET /users/{id}`
-
-### GraphQL
-
-Endpoint:
-
-```text
-/graphql
-```
-
-Queries disponiveis hoje:
-
-- `allProducts`
-- `product(id)`
-- `allCategories`
-
-Mutation disponivel hoje:
-
-- `createSale(items)`
-
-## O que ainda esta pendente
-
-- registrar routers reais no FastAPI
-- adicionar testes
-- conectar o frontend existente ao backend
-- expandir queries e mutations para cobrir o dominio inteiro
-- integrar auth de forma completa dentro do fluxo GraphQL
-- expor REST de negocio, caso essa camada seja mantida
-
-## Observacoes importantes
-
-- O ponto de entrada da API hoje e `app.main:app`.
-- O arquivo [`main.py`](./main.py) na raiz e apenas o placeholder gerado no setup inicial e nao e o entrypoint do servidor FastAPI.
-- O `docker-compose.yml` atual sobe somente o banco PostgreSQL.
-- Auth e GraphQL ja estao montados, mas a cobertura funcional ainda e parcial.
-- O frontend em `insonia-frontend/` ainda nao esta conectado a este backend.
-
-## Proximos passos
-
-Seguindo o estado atual do repositorio, a sequencia natural agora e:
-
-1. expandir o schema GraphQL para marcas, vendas, historico e operacoes de produto
-2. fortalecer o fluxo autenticado dentro dos resolvers e mutations
-3. adicionar testes para auth, services e GraphQL
-4. decidir se a camada REST de dominio sera mantida ou se o backend sera GraphQL-first
-5. conectar o frontend existente ao backend
+1. Aplicar correções do [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) (bugs críticos e segurança primeiro)
+2. Implementar testes de serviços — Fase 3.5 do [`IMPL_GUIDE.md`](./IMPL_GUIDE.md)
+3. Implementar testes das mutations GraphQL — Fase 4.6
+4. Upload de imagens — Fase 5
+5. Conectar frontend — Fase 6
