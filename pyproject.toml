@@ -18,3 +18,8 @@ dependencies = [
 ]
 [tool.pylint.messages_control]
 disable = ["no-member"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6.0",
+]
