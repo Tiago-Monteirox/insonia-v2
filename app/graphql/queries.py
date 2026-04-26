@@ -2,11 +2,21 @@ from typing import Optional
 
 import strawberry
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from strawberry.types import Info
 
-from app.graphql.types import CategoryType, MoneyType, ProductType
+from app.graphql.types import (
+    BrandType,
+    CategoryType,
+    MoneyType,
+    ProductType,
+    SaleItemType,
+    SaleType,
+)
+from app.models.brand import Brand
 from app.models.category import Category
 from app.models.product import Product
+from app.models.sale import Sale
 
 
 def product_model_to_type(p: Product) -> ProductType:
@@ -23,6 +33,27 @@ def product_model_to_type(p: Product) -> ProductType:
             if p.promotional_price
             else None
         ),
+    )
+
+
+def sale_model_to_type(s: Sale) -> SaleType:
+    """Converte um modelo ORM de venda para o tipo GraphQL correspondente."""
+    return SaleType(
+        id=s.id,
+        user_id=s.user_id,
+        sale_date=s.sale_date,
+        total_amount=float(s.total_amount),
+        total_profit=float(s.total_profit),
+        items=[
+            SaleItemType(
+                id=item.id,
+                product_id=item.product_id,
+                quantity=item.quantity,
+                sale_price=MoneyType(amount=float(item.sale_price), currency="BRL"),
+                cost_price=MoneyType(amount=float(item.cost_price), currency="BRL"),
+            )
+            for item in s.items
+        ],
     )
 
 
@@ -52,3 +83,36 @@ class Query:
         result = await db.execute(select(Category))
         rows = result.scalars().all()
         return [CategoryType(id=c.id, name=c.name, slug=c.slug) for c in rows]
+
+    @strawberry.field
+    async def all_brands(self, info: Info) -> list[BrandType]:
+        """Retorna todas as marcas cadastradas."""
+        db = info.context["db"]
+        result = await db.execute(select(Brand))
+        rows = result.scalars().all()
+        return [BrandType(id=r.id, name=r.name, slug=r.slug) for r in rows]
+
+    @strawberry.field
+    async def brand(self, info: Info, id: int) -> BrandType | None:
+        """Consulta uma marca por ID ou None se não encontrada."""
+        db = info.context["db"]
+        result = await db.execute(select(Brand).where(Brand.id == id))
+        r = result.scalar_one_or_none()
+        return BrandType(id=r.id, name=r.name, slug=r.slug) if r else None
+
+    @strawberry.field
+    async def all_sales(self, info: Info) -> list[SaleType]:
+        """Retorna todas as vendas cadastradas."""
+        db = info.context["db"]
+        result = await db.execute(select(Sale).options(selectinload(Sale.items)))
+        return [sale_model_to_type(s) for s in result.scalars()]
+
+    @strawberry.field
+    async def sale(self, info: Info, id: int) -> SaleType | None:
+        """Consulta uma venda por ID ou None se não encontrada."""
+        db = info.context["db"]
+        result = await db.execute(
+            select(Sale).options(selectinload(Sale.items).where(Sale.id == id))
+        )
+        s = result.scalar_one_or_none()
+        return sale_model_to_type(s) if s else None
