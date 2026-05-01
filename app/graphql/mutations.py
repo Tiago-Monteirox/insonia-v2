@@ -11,8 +11,8 @@ from app.graphql.types import BrandType, CategoryType, ProductType
 from app.models.brand import Brand
 from app.models.category import Category
 from app.models.product import Product
-from app.services.sale import ItemInput
 from app.services.sale import create_sale as svc_create_sale
+from app.services.sale import remove_sale
 
 
 @strawberry.input
@@ -42,31 +42,11 @@ class Mutation:
         db = info.context["db"]
         user = info.context["user"]
 
-        # Buscar preços do banco para não confiar no cliente
-        from sqlalchemy import select
+        try:
+            sale = await svc_create_sale(db, user.id, items)
+        except ValueError as e:
+            raise strawberry.exceptions.graphql_error.GraphQLError(str(e))
 
-        from app.models.product import Product
-
-        items_input = []
-        for item in items:
-            result = await db.execute(
-                select(Product).where(Product.id == item.product_id)
-            )
-            product = result.scalar_one_or_none()
-            if product is None:
-                raise strawberry.exceptions.graphql_error.GraphQLError(
-                    "Produto não encontrado"
-                )
-            items_input.append(
-                ItemInput(
-                    product_id=item.product_id,
-                    quantity=item.quantity,
-                    sale_price=product.sale_price,
-                    cost_price=product.cost_price,
-                )
-            )
-
-        sale = await svc_create_sale(db, user.id, items_input)
         return SaleResult(
             id=sale.id,
             total_amount=float(sale.total_amount),
@@ -167,6 +147,40 @@ class Mutation:
         await db.commit()
         return True
 
+    @strawberry.mutation
+    async def update_category(
+        self, info: Info, id: int, input: CategoryInput
+    ) -> CategoryType:
+        """Atualiza os dados de uma categoria existente."""
+        db = info.context["db"]
+        result = await db.execute(select(Category).where(Category.id == id))
+        category = result.scalar_one_or_none()
+        if category is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Categoria não encontrada"
+            )
+        category.name = input.name
+        category.slug = slugify(input.name)
+        await db.commit()
+        await db.refresh(category)
+        return CategoryType(id=category.id, name=category.name, slug=category.slug)
+
+    @strawberry.mutation
+    async def update_brand(self, info: Info, id: int, input: BrandInput) -> BrandType:
+        """Atualiza os dados de uma marca existente."""
+        db = info.context["db"]
+        result = await db.execute(select(Brand).where(Brand.id == id))
+        brand = result.scalar_one_or_none()
+        if brand is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Marca não encontrada"
+            )
+        brand.name = input.name
+        brand.slug = slugify(input.name)
+        await db.commit()
+        await db.refresh(brand)
+        return BrandType(id=brand.id, name=brand.name, slug=brand.slug)
+
     # --- Marca ---
 
     @strawberry.mutation
@@ -199,7 +213,6 @@ class Mutation:
     async def delete_sale(self, info: Info, id: int) -> bool:
         """Remove uma venda e restaura o estoque de todos os seus itens."""
         db = info.context["db"]
-        from app.services.sale import remove_sale
 
         await remove_sale(db, id)
         return True

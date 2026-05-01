@@ -1,29 +1,29 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.models.product import Product
 from app.models.sale import Sale, SaleItem
-from app.services.stock import check_stock, decrement_stock, increment_stock
+from app.services.stock import decrement_stock_atomic, increment_stock
 
 
 @dataclass
-class ItemInput:
+class SaleItemInput:
+    """Dados de entrada de um item de venda vindos do resolver."""
+
     product_id: int
     quantity: int
-    sale_price: Decimal
-    cost_price: Decimal
 
 
-async def create_sale(db: AsyncSession, user_id: int, items: list[ItemInput]) -> Sale:
-    """Cria uma venda atomicamente: verifica estoque, decrementa e persiste os itens."""
+async def create_sale(
+    db: AsyncSession, user_id: int, items: list[SaleItemInput]
+) -> Sale:
+    """Cria uma venda atomicamente: verifica estoque e cria a venda automaticamente."""
     async with db.begin():
-        # Verificar estoque de todos antes de qualquer decremento
-        for item in items:
-            await check_stock(db, item.product_id, item.quantity)
-
         sale = Sale(user_id=user_id)
         db.add(sale)
         await db.flush()  # flush para obter sale.id sem commitar
@@ -32,18 +32,28 @@ async def create_sale(db: AsyncSession, user_id: int, items: list[ItemInput]) ->
         total_profit = Decimal("0")
 
         for item in items:
+            result = await db.execute(
+                select(Product.sale_price, Product.cost_price).where(
+                    Product.id == item.product_id
+                )
+            )
+            row = result.fetchone()
+            if row is None:
+                raise ValueError(f"Produto {item.product_id} não encontrado")
+
+            await decrement_stock_atomic(db, item.product_id, item.quantity)
+
             iv = SaleItem(
                 sale_id=sale.id,
                 product_id=item.product_id,
                 quantity=item.quantity,
-                sale_price=item.sale_price,
-                cost_price=item.cost_price,
+                sale_price=row.sale_price,
+                cost_price=row.cost_price,
             )
             db.add(iv)
-            await decrement_stock(db, item.product_id, item.quantity)
 
-            subtotal = item.sale_price * item.quantity
-            total_cost = item.cost_price * item.quantity
+            subtotal = row.sale_price * item.quantity
+            total_cost = row.cost_price * item.quantity
             total_amount += subtotal
             total_profit += subtotal - total_cost
 
@@ -61,8 +71,6 @@ async def remove_sale(db: AsyncSession, sale_id: int) -> None:
         )
         sale = result.scalar_one_or_none()
         if sale is None:
-            from fastapi import HTTPException
-
             raise HTTPException(status_code=404, detail="Venda não encontrada")
 
         for item in sale.items:

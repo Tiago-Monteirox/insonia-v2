@@ -5,8 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.product import Product
 
 
-async def check_stock(db: AsyncSession, product_id: int, quantity: int) -> None:
-    """Levanta HTTPException se o produto não tiver estoque suficiente."""
+async def check_stock_atomic(db: AsyncSession, product_id: int, quantity: int) -> None:
+    """Decrementa estoque atomicamente. Levanta ValueError se insuficiente."""
     result = await db.execute(select(Product.stock).where(Product.id == product_id))
     stock = result.scalar_one_or_none()
     if stock is None:
@@ -17,13 +17,29 @@ async def check_stock(db: AsyncSession, product_id: int, quantity: int) -> None:
         )
 
 
-async def decrement_stock(db: AsyncSession, product_id: int, quantity: int) -> None:
-    """Subtrai a quantidade do estoque do produto (usado ao registrar uma venda)."""
-    await db.execute(
+async def decrement_stock_atomic(
+    db: AsyncSession, product_id: int, quantity: int
+) -> None:
+    """Decrementa estoque atomicamente. Levanta ValueError se insuficiente."""
+    result = await db.execute(
         update(Product)
-        .where(Product.id == product_id)
+        .where(Product.id == product_id, Product.stock >= quantity)
         .values(stock=Product.stock - quantity)
+        .returning(Product.stock)
     )
+    row = result.fetchone()
+    if row is None:
+        # Produto não existe ou estoque insuficiente — verifica qual
+        check = await db.execute(
+            select(Product.stock, Product.id).where(Product.id == product_id)
+        )
+        rec = check.fetchone()
+        if rec is None:
+            raise ValueError(f"Produto {product_id} não encontrado")
+        raise ValueError(
+            f"Estoque insuficiente para produto"
+            f" {product_id}: {rec.stock} disponível, {quantity} solicitado"
+        )
 
 
 async def increment_stock(db: AsyncSession, product_id: int, quantity: int) -> None:

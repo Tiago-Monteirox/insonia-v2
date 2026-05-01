@@ -2,9 +2,15 @@ from slugify import slugify
 from sqlalchemy import event
 
 
-def _generate_slug(mapper, connection, target):
-    """Gera slug automaticamente a partir do nome antes de inserir ou atualizar."""
+def _get_slug_on_insert(mapper, connection, target):
+    """Gera slug apenas na inserção."""
     if target.name and not target.slug:
+        target.slug = slugify(target.name)
+
+
+def _set_slug_on_update(mapper, connection, target):
+    """Regenera slug sempre que o nome mudar em um update."""
+    if target.name:
         target.slug = slugify(target.name)
 
 
@@ -13,5 +19,5 @@ class SlugMixin:
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
-        event.listens_for(cls, "before_insert", _generate_slug)
-        event.listens_for(cls, "before_update", _generate_slug)
+        event.listen(cls, "before_insert", _get_slug_on_insert)
+        event.listen(cls, "before_update", _set_slug_on_update)
