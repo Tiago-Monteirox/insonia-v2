@@ -41,4 +41,4 @@ repos:
     hooks:
       - id: markdownlint
         args: [--fix]
-        exclude: ^(IMPL_GUIDE|FIXES_GUIDE|ROADMAP|insonia-frontend/README|insonia-frontend/SKILL|insonia-frontend/ui_kits|insonia-frontend/ui_kits/insonia_app/README|insonia-frontend/ui_kits/insonia_store/README)\.md$|^\.planning/
+        exclude: ^(IMPL_GUIDE|FIXES_GUIDE|ROADMAP|insonia-frontend/README|insonia-frontend/SKILL|insonia-frontend/ui_kits|insonia-frontend/ui_kits/insonia_app/README|README|insonia-frontend/ui_kits/insonia_store/README)\.md$|^\.planning/

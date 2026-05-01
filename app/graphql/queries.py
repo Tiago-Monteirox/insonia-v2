@@ -112,7 +112,7 @@ class Query:
         """Consulta uma venda por ID ou None se não encontrada."""
         db = info.context["db"]
         result = await db.execute(
-            select(Sale).options(selectinload(Sale.items).where(Sale.id == id))
+            select(Sale).options(selectinload(Sale.items)).where(Sale.id == id)
         )
         s = result.scalar_one_or_none()
         return sale_model_to_type(s) if s else None

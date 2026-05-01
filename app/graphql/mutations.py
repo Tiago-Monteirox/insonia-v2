@@ -52,7 +52,11 @@ class Mutation:
             result = await db.execute(
                 select(Product).where(Product.id == item.product_id)
             )
-            product = result.scalar_one()
+            product = result.scalar_one_or_none()
+            if product is None:
+                raise strawberry.exceptions.graphql_error.GraphQLError(
+                    "Produto não encontrado"
+                )
             items_input.append(
                 ItemInput(
                     product_id=item.product_id,
@@ -102,7 +106,11 @@ class Mutation:
         """Atualiza os dados de um produto existente."""
         db = info.context["db"]
         result = await db.execute(select(Product).where(Product.id == id))
-        product = result.scalar_one()
+        product = result.scalar_one_or_none()
+        if product is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Produto não encontrado"
+            )
         product.name = input.name
         product.sale_price = Decimal(str(input.sale_price))
         product.cost_price = Decimal(str(input.cost_price))
@@ -124,7 +132,11 @@ class Mutation:
         """Remove um produto pelo ID. Retorna True se deletado com sucesso."""
         db = info.context["db"]
         result = await db.execute(select(Product).where(Product.id == id))
-        product = result.scalar_one()
+        product = result.scalar_one_or_none()
+        if product is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Produto não encontrado"
+            )
         await db.delete(product)
         await db.commit()
         return True
@@ -146,7 +158,11 @@ class Mutation:
         """Remove uma categoria pelo ID. Retorna True se deletada com sucesso."""
         db = info.context["db"]
         result = await db.execute(select(Category).where(Category.id == id))
-        category = result.scalar_one()
+        category = result.scalar_one_or_none()
+        if category is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Categoria não encontrada"
+            )
         await db.delete(category)
         await db.commit()
         return True
@@ -168,7 +184,11 @@ class Mutation:
         """Remove uma marca pelo ID. Retorna True se deletada com sucesso."""
         db = info.context["db"]
         result = await db.execute(select(Brand).where(Brand.id == id))
-        brand = result.scalar_one()
+        brand = result.scalar_one_or_none()
+        if brand is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Marca não encontrada"
+            )
         await db.delete(brand)
         await db.commit()
         return True
