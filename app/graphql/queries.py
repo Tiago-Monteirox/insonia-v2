@@ -62,10 +62,12 @@ class Query:
     """Raiz de queries GraphQL do projeto."""
 
     @strawberry.field
-    async def all_products(self, info: Info) -> list[ProductType]:
-        """Retorna todos os produtos cadastrados."""
+    async def all_products(
+        self, info: Info, limit: int = 100, offset: int = 0
+    ) -> list[ProductType]:
+        """Retorna produtos com paginação. Padrão: primeiros 100."""
         db = info.context["db"]
-        result = await db.execute(select(Product))
+        result = await db.execute(select(Product).limit(limit).offset(offset))
         return [product_model_to_type(p) for p in result.scalars()]
 
     @strawberry.field
@@ -77,18 +79,22 @@ class Query:
         return product_model_to_type(p) if p else None
 
     @strawberry.field
-    async def all_categories(self, info: Info) -> list[CategoryType]:
-        """Retorna todas as categorias cadastradas."""
+    async def all_categories(
+        self, info: Info, limit: int = 20, offset: int = 0
+    ) -> list[CategoryType]:
+        """Retorna todas as categorias cadastradas com paginação."""
         db = info.context["db"]
-        result = await db.execute(select(Category))
+        result = await db.execute(select(Category).limit(limit).offset(offset))
         rows = result.scalars().all()
         return [CategoryType(id=c.id, name=c.name, slug=c.slug) for c in rows]
 
     @strawberry.field
-    async def all_brands(self, info: Info) -> list[BrandType]:
-        """Retorna todas as marcas cadastradas."""
+    async def all_brands(
+        self, info: Info, limit: int = 20, offset: int = 0
+    ) -> list[BrandType]:
+        """Retorna todas as marcas cadastradas com paginação."""
         db = info.context["db"]
-        result = await db.execute(select(Brand))
+        result = await db.execute(select(Brand).limit(limit).offset(offset))
         rows = result.scalars().all()
         return [BrandType(id=r.id, name=r.name, slug=r.slug) for r in rows]
 
@@ -101,14 +107,19 @@ class Query:
         return BrandType(id=r.id, name=r.name, slug=r.slug) if r else None
 
     @strawberry.field
-    async def all_sales(self, info: Info) -> list[SaleType]:
-        """Retorna todas as vendas cadastradas do usuário cadastrado."""
+    async def all_sales(
+        self, info: Info, limit: int = 50, offset: int = 0
+    ) -> list[SaleType]:
+        """Retorna todas as vendas do usuário autenticado com paginação."""
         db = info.context["db"]
         user = info.context["user"]
         result = await db.execute(
             select(Sale)
             .options(selectinload(Sale.items))
             .where(Sale.user_id == user.id)
+            .order_by(Sale.sale_date.desc())
+            .limit(limit)
+            .offset(offset)
         )
         return [sale_model_to_type(s) for s in result.scalars()]
 
