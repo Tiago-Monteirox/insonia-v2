@@ -2,12 +2,9 @@
 
 Reconstrução do backend do Insonia com FastAPI, SQLAlchemy async, PostgreSQL e Strawberry GraphQL.
 
-O frontend já existe em [`insonia-frontend/`](./insonia-frontend). O backend saiu do estado de infra e hoje entrega
-autenticação JWT, domínio completo de produtos/categorias/marcas/vendas via GraphQL, serviços de estoque com
-atomicidade e um schema GraphQL completo montado no FastAPI.
-
-Antes de avançar para as próximas fases, leia [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) — ele lista bugs conhecidos,
-dívida técnica e issues de segurança a corrigir primeiro.
+O frontend já existe em [`insonia-frontend/`](./insonia-frontend). O backend entrega autenticação JWT,
+domínio completo de produtos/categorias/marcas/vendas via GraphQL, serviços de estoque com atomicidade,
+rate limiting nos endpoints de auth e um schema GraphQL completo montado no FastAPI.
 
 ## Estado atual
 
@@ -19,11 +16,15 @@ O projeto entrega hoje:
 - engine e session factory async do SQLAlchemy em [`app/core/database.py`](./app/core/database.py)
 - modelos SQLAlchemy do domínio completo em [`app/models/`](./app/models)
 - geração automática de slug para entidades com nome via `SlugMixin`
-- autenticação JWT com `fastapi-users` em [`app/core/auth.py`](./app/core/auth.py)
+- autenticação JWT com `fastapi-users` — secrets separados para JWT, reset e verificação
 - usuário autenticado injetado no contexto de cada resolver GraphQL
 - schema GraphQL com CRUD completo de produto, categoria, marca e venda em [`app/graphql/`](./app/graphql)
-- inputs tipados para mutations em [`app/graphql/inputs.py`](./app/graphql/inputs.py)
-- serviços de estoque e venda em [`app/services/`](./app/services)
+- queries de lista com paginação (`limit` / `offset`)
+- `allSales` filtrado pelo usuário autenticado
+- mutations de produto/categoria/marca restritas a superusuários
+- `deleteSale` com verificação de posse
+- decremento de estoque atômico via `UPDATE ... RETURNING` (sem race condition)
+- rate limiting por IP no prefixo `/auth` via middleware ASGI
 - setup do Alembic em [`alembic.ini`](./alembic.ini) e [`migrations/`](./migrations)
 - PostgreSQL local via [`docker-compose.yml`](./docker-compose.yml)
 - dependências gerenciadas com `uv`
@@ -31,7 +32,6 @@ O projeto entrega hoje:
 O projeto ainda não entrega:
 
 - testes (veja Fase 3.5 e 4.6 em [`IMPL_GUIDE.md`](./IMPL_GUIDE.md))
-- paginação nas queries de lista
 - CORS configurado
 - upload de imagens (Fase 5)
 - integração real com o frontend (Fase 6)
@@ -55,13 +55,13 @@ O projeto ainda não entrega:
 insonia-v2/
 ├── app/
 │   ├── core/
-│   │   ├── auth.py          # fastapi-users, JWT strategy
+│   │   ├── auth.py          # fastapi-users, JWT strategy, secrets separados
 │   │   ├── config.py        # variáveis de ambiente via python-decouple
 │   │   └── database.py      # engine async, session factory, Base
 │   ├── graphql/
 │   │   ├── inputs.py        # ProductInput, CategoryInput, BrandInput
 │   │   ├── mutations.py     # CRUD de produto, categoria, marca, venda
-│   │   ├── queries.py       # queries de listagem e busca por ID
+│   │   ├── queries.py       # queries de listagem (paginadas) e busca por ID
 │   │   ├── schema.py        # montagem do schema + contexto (db, user)
 │   │   └── types.py         # tipos GraphQL do domínio
 │   ├── models/
@@ -72,23 +72,23 @@ insonia-v2/
 │   │   ├── sale.py          # Sale + SaleItem
 │   │   ├── user.py
 │   │   └── variation.py     # VariationName, VariationValue, Variation
-│   ├── routers/             # reservado para Fase 5+ (upload, etc.)
+│   ├── routers/
+│   │   └── auth_rate_limit.py  # AuthRateLimitMiddleware (sliding window por IP)
 │   ├── schemas/
 │   │   └── user.py          # UserRead, UserCreate, UserUpdate
 │   ├── services/
 │   │   ├── sale.py          # create_sale (atômico), remove_sale
-│   │   └── stock.py         # check_stock, decrement_stock, increment_stock
+│   │   └── stock.py         # decrement_stock_atomic, increment_stock
 │   └── main.py              # entrypoint da API
 ├── migrations/
 │   └── versions/
-│       ├── 37d9af481f87_initial.py
-│       └── c57cdf359e3d_add_users_table.py
-├── tests/                   # vazio — a implementar (veja IMPL_GUIDE.md Fase 3.5)
+│       └── 37d9af481f87_initial.py
+├── tests/                   # a implementar (veja IMPL_GUIDE.md Fase 3.5)
 ├── .planning/
 │   └── codebase/            # mapa do codebase gerado por análise estática
 ├── alembic.ini
 ├── docker-compose.yml
-├── FIXES_GUIDE.md           # bugs e dívida técnica a corrigir antes de avançar
+├── FIXES_GUIDE.md           # bugs e dívida técnica (concluído)
 ├── IMPL_GUIDE.md            # passo a passo completo de implementação
 ├── ROADMAP.md               # fases do projeto
 ├── pyproject.toml
@@ -129,13 +129,16 @@ Crie um `.env` na raiz com:
 
 ```env
 DATABASE_URL=postgresql+asyncpg://insonia:insonia@localhost:5432/insonia
-SECRET_KEY=troque-isso-por-uma-string-longa-e-aleatoria
+SECRET_KEY=string-longa-e-aleatoria
+RESET_PASSWORD_SECRET=outra-string-longa-aleatoria
+VERIFICATION_SECRET=mais-uma-string-longa-aleatoria
 DEBUG=False
 JWT_LIFETIME_SECONDS=3600
 MAX_IMAGE_SIZE_MB=5
 ```
 
-`DEBUG` deve ser `True` ou `False` (booleano válido para o `python-decouple`).
+`DEBUG` deve ser `True` ou `False`. Quando `True`, o SQLAlchemy loga todas as queries no stdout —
+nunca use `True` em produção.
 
 ## Autenticação
 
@@ -151,49 +154,58 @@ Rotas geradas automaticamente pelo `fastapi-users`:
 | GET | `/users/{id}` | Buscar usuário por ID |
 
 O token JWT deve ser enviado no header `Authorization: Bearer <token>` em todas as requests autenticadas,
-incluindo as queries e mutations GraphQL.
+incluindo queries e mutations GraphQL.
+
+Os endpoints `/auth/*` têm rate limiting de 10 requisições por minuto por IP.
 
 ## GraphQL
 
 Endpoint: `POST /graphql` — interface interativa em `http://localhost:8000/graphql`
 
+Todas as operações requerem autenticação. No cliente GraphQL, adicione o header:
+```json
+{"Authorization": "Bearer <token>"}
+```
+
 ### Queries
 
-| Query | Descrição |
-|-------|-----------|
-| `allProducts(limit, offset)` | Lista produtos |
-| `product(id)` | Busca produto por ID |
-| `allCategories` | Lista categorias |
-| `category(id)` | Busca categoria por ID |
-| `allBrands` | Lista marcas |
-| `brand(id)` | Busca marca por ID |
-| `allSales` | Lista vendas do usuário autenticado |
-| `sale(id)` | Busca venda por ID |
+| Query | Parâmetros | Descrição |
+|-------|------------|-----------|
+| `allProducts(limit, offset)` | `limit=100`, `offset=0` | Lista produtos paginados |
+| `product(id)` | — | Busca produto por ID |
+| `allCategories(limit, offset)` | `limit=20`, `offset=0` | Lista categorias paginadas |
+| `allBrands(limit, offset)` | `limit=20`, `offset=0` | Lista marcas paginadas |
+| `brand(id)` | — | Busca marca por ID |
+| `allSales(limit, offset)` | `limit=50`, `offset=0` | Vendas do usuário autenticado, ordenadas por data desc |
+| `sale(id)` | — | Busca venda por ID |
 
 ### Mutations
 
-| Mutation | Descrição |
-|----------|-----------|
-| `createProduct(input)` | Cria produto |
-| `updateProduct(id, input)` | Atualiza produto |
-| `deleteProduct(id)` | Remove produto |
-| `createCategory(input)` | Cria categoria |
-| `deleteCategory(id)` | Remove categoria |
-| `createBrand(input)` | Cria marca |
-| `deleteBrand(id)` | Remove marca |
-| `createSale(items)` | Cria venda (decrementa estoque atomicamente) |
-| `deleteSale(id)` | Cancela venda (restaura estoque) |
+| Mutation | Permissão | Descrição |
+|----------|-----------|-----------|
+| `createProduct(input)` | superuser | Cria produto |
+| `updateProduct(id, input)` | superuser | Atualiza produto |
+| `deleteProduct(id)` | superuser | Remove produto |
+| `createCategory(input)` | superuser | Cria categoria |
+| `updateCategory(id, input)` | superuser | Atualiza categoria |
+| `deleteCategory(id)` | superuser | Remove categoria |
+| `createBrand(input)` | superuser | Cria marca |
+| `updateBrand(id, input)` | superuser | Atualiza marca |
+| `deleteBrand(id)` | superuser | Remove marca |
+| `createSale(items)` | autenticado | Cria venda (decrementa estoque atomicamente) |
+| `deleteSale(id)` | dono ou superuser | Cancela venda (restaura estoque) |
 
 ### Exemplo rápido
 
 ```graphql
-# Criar produto
+# Criar produto (requer superuser)
 mutation {
   createProduct(input: {
     name: "Camiseta Preta M"
     salePrice: 89.90
     costPrice: 35.00
     stock: 50
+    currency: "BRL"
   }) {
     id name slug salePrice { amount currency }
   }
@@ -205,19 +217,26 @@ mutation {
     id totalAmount totalProfit
   }
 }
+
+# Listar vendas com paginação
+query {
+  allSales(limit: 10, offset: 0) {
+    id saleDate totalAmount totalProfit
+    items { productId quantity }
+  }
+}
 ```
 
 ## Serviços de negócio
 
 A camada de serviços em `app/services/` contém as regras críticas do domínio:
 
-- **`create_sale`** — verifica estoque, decrementa e persiste todos os itens dentro de uma única transação.
-  Se qualquer item falhar, a venda inteira é revertida.
+- **`create_sale`** — busca preços do banco, decrementa estoque atomicamente via `UPDATE ... RETURNING`
+  e persiste todos os itens dentro de uma única transação. Se qualquer item falhar, a venda inteira é revertida.
 - **`remove_sale`** — cancela a venda e restaura o estoque de cada item.
-- **`check_stock`** / **`decrement_stock`** / **`increment_stock`** — operações individuais de estoque.
-
-> Atenção: há uma race condition conhecida no check/decrement de estoque em requisições simultâneas.
-> A correção está documentada em [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) seção 1.3.
+- **`decrement_stock_atomic`** — decremento atômico sem race condition: um único `UPDATE` com
+  `WHERE stock >= quantity` garante que dois pedidos simultâneos não levem o estoque a negativo.
+- **`increment_stock`** — restaura estoque ao cancelar uma venda.
 
 ## Banco de dados
 
@@ -256,15 +275,13 @@ uv run alembic current
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) | Bugs, dívida técnica e segurança a corrigir antes de avançar |
 | [`IMPL_GUIDE.md`](./IMPL_GUIDE.md) | Passo a passo completo de implementação de cada fase |
 | [`ROADMAP.md`](./ROADMAP.md) | Visão geral das fases do projeto |
 | [`.planning/codebase/`](./.planning/codebase/) | Mapa do codebase (stack, arquitetura, convenções, concerns) |
 
 ## Próximos passos
 
-1. Aplicar correções do [`FIXES_GUIDE.md`](./FIXES_GUIDE.md) (bugs críticos e segurança primeiro)
-2. Implementar testes de serviços — Fase 3.5 do [`IMPL_GUIDE.md`](./IMPL_GUIDE.md)
-3. Implementar testes das mutations GraphQL — Fase 4.6
-4. Upload de imagens — Fase 5
-5. Conectar frontend — Fase 6
+1. Implementar testes de serviços — Fase 3.5 do [`IMPL_GUIDE.md`](./IMPL_GUIDE.md)
+2. Implementar testes das mutations GraphQL — Fase 4.6
+3. Upload de imagens — Fase 5
+4. Conectar frontend — Fase 6
