@@ -213,6 +213,8 @@ class Mutation:
     async def delete_sale(self, info: Info, id: int) -> bool:
         """Remove uma venda e restaura o estoque de todos os seus itens."""
         db = info.context["db"]
-
-        await remove_sale(db, id)
+        try:
+            await remove_sale(db, id)
+        except ValueError as e:
+            raise strawberry.exceptions.graphql_error.GraphQLError(str(e))
         return True

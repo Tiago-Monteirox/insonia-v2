@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from decimal import Decimal
 
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -71,7 +70,7 @@ async def remove_sale(db: AsyncSession, sale_id: int) -> None:
         )
         sale = result.scalar_one_or_none()
         if sale is None:
-            raise HTTPException(status_code=404, detail="Venda não encontrada")
+            raise ValueError(f"Venda {sale_id} não encontrada")
 
         for item in sale.items:
             await increment_stock(db, item.product_id, item.quantity)
