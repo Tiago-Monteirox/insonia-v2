@@ -11,6 +11,7 @@ from app.graphql.types import BrandType, CategoryType, ProductType
 from app.models.brand import Brand
 from app.models.category import Category
 from app.models.product import Product
+from app.models.sale import Sale
 from app.services.sale import create_sale as svc_create_sale
 from app.services.sale import remove_sale
 
@@ -59,6 +60,12 @@ class Mutation:
     async def create_product(self, info: Info, input: ProductInput) -> ProductType:
         """Cria um novo produto com os dados informados."""
         db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
+
         product = Product(
             name=input.name,
             sale_price=Decimal(str(input.sale_price)),
@@ -85,6 +92,11 @@ class Mutation:
     ) -> ProductType:
         """Atualiza os dados de um produto existente."""
         db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
         result = await db.execute(select(Product).where(Product.id == id))
         product = result.scalar_one_or_none()
         if product is None:
@@ -111,6 +123,11 @@ class Mutation:
     async def delete_product(self, info: Info, id: int) -> bool:
         """Remove um produto pelo ID. Retorna True se deletado com sucesso."""
         db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
         result = await db.execute(select(Product).where(Product.id == id))
         product = result.scalar_one_or_none()
         if product is None:
@@ -127,6 +144,11 @@ class Mutation:
     async def create_category(self, info: Info, input: CategoryInput) -> CategoryType:
         """Cria uma nova categoria."""
         db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
         category = Category(name=input.name)
         db.add(category)
         await db.commit()
@@ -134,25 +156,16 @@ class Mutation:
         return CategoryType(id=category.id, name=category.name, slug=category.slug)
 
     @strawberry.mutation
-    async def delete_category(self, info: Info, id: int) -> bool:
-        """Remove uma categoria pelo ID. Retorna True se deletada com sucesso."""
-        db = info.context["db"]
-        result = await db.execute(select(Category).where(Category.id == id))
-        category = result.scalar_one_or_none()
-        if category is None:
-            raise strawberry.exceptions.graphql_error.GraphQLError(
-                "Categoria não encontrada"
-            )
-        await db.delete(category)
-        await db.commit()
-        return True
-
-    @strawberry.mutation
     async def update_category(
         self, info: Info, id: int, input: CategoryInput
     ) -> CategoryType:
         """Atualiza os dados de uma categoria existente."""
         db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
         result = await db.execute(select(Category).where(Category.id == id))
         category = result.scalar_one_or_none()
         if category is None:
@@ -166,9 +179,50 @@ class Mutation:
         return CategoryType(id=category.id, name=category.name, slug=category.slug)
 
     @strawberry.mutation
+    async def delete_category(self, info: Info, id: int) -> bool:
+        """Remove uma categoria pelo ID. Retorna True se deletada com sucesso."""
+        db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
+        result = await db.execute(select(Category).where(Category.id == id))
+        category = result.scalar_one_or_none()
+        if category is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Categoria não encontrada"
+            )
+        await db.delete(category)
+        await db.commit()
+        return True
+
+    # --- Marca ---
+
+    @strawberry.mutation
+    async def create_brand(self, info: Info, input: BrandInput) -> BrandType:
+        """Cria uma nova marca."""
+        db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
+        brand = Brand(name=input.name)
+        db.add(brand)
+        await db.commit()
+        await db.refresh(brand)
+        return BrandType(id=brand.id, name=brand.name, slug=brand.slug)
+
+    @strawberry.mutation
     async def update_brand(self, info: Info, id: int, input: BrandInput) -> BrandType:
         """Atualiza os dados de uma marca existente."""
         db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
         result = await db.execute(select(Brand).where(Brand.id == id))
         brand = result.scalar_one_or_none()
         if brand is None:
@@ -181,22 +235,15 @@ class Mutation:
         await db.refresh(brand)
         return BrandType(id=brand.id, name=brand.name, slug=brand.slug)
 
-    # --- Marca ---
-
-    @strawberry.mutation
-    async def create_brand(self, info: Info, input: BrandInput) -> BrandType:
-        """Cria uma nova marca."""
-        db = info.context["db"]
-        brand = Brand(name=input.name)
-        db.add(brand)
-        await db.commit()
-        await db.refresh(brand)
-        return BrandType(id=brand.id, name=brand.name, slug=brand.slug)
-
     @strawberry.mutation
     async def delete_brand(self, info: Info, id: int) -> bool:
         """Remove uma marca pelo ID. Retorna True se deletada com sucesso."""
         db = info.context["db"]
+        user = info.context["user"]
+        if not user.is_superuser:
+            raise strawberry.exceptions.GraphQLError(
+                "Apenas administradores podem realizar esta operação"
+            )
         result = await db.execute(select(Brand).where(Brand.id == id))
         brand = result.scalar_one_or_none()
         if brand is None:
@@ -213,6 +260,19 @@ class Mutation:
     async def delete_sale(self, info: Info, id: int) -> bool:
         """Remove uma venda e restaura o estoque de todos os seus itens."""
         db = info.context["db"]
+        user = info.context["user"]
+
+        result = await db.execute(select(Sale).where(Sale.id == id))
+        sale = result.scalar_one_or_none()
+        if sale is None:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Venda não encontrada"
+            )
+        if sale.user_id != user.id and not user.is_superuser:
+            raise strawberry.exceptions.graphql_error.GraphQLError(
+                "Sem permissão para deletar esta venda"
+            )
+
         try:
             await remove_sale(db, id)
         except ValueError as e:

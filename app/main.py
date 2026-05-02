@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from app.core.auth import auth_backend, fastapi_users
 from app.graphql.schema import graphql_app
+from app.routers.auth_rate_limit import AuthRateLimitMiddleware
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 
@@ -14,6 +15,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Insonia v2", lifespan=lifespan)
+
+app.add_middleware(AuthRateLimitMiddleware, max_requests=10, window_seconds=60)
 
 
 @app.get("/health")
