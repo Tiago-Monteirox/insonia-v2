@@ -8,7 +8,12 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyUserDatabase
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import JWT_LIFETIME_SECONDS, SECRET_KEY
+from app.core.config import (
+    JWT_LIFETIME_SECONDS,
+    RESET_PASSWORD_SECRET,
+    SECRET_KEY,
+    VERIFICATION_SECRET,
+)
 from app.core.database import get_db
 from app.models.user import User
 
@@ -21,8 +26,8 @@ async def get_user_db(session: AsyncSession = Depends(get_db)):
 class UserManager(IntegerIDMixin, BaseUserManager[User, int]):
     """Gerencia operações de usuário: criação, reset de senha, verificação."""
 
-    reset_password_token_secret = SECRET_KEY
-    verification_token_secret = SECRET_KEY
+    reset_password_token_secret = RESET_PASSWORD_SECRET
+    verification_token_secret = VERIFICATION_SECRET
 
 
 async def get_user_manager(user_db: SQLAlchemyUserDatabase = Depends(get_user_db)):
