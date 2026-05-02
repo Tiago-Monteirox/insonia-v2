@@ -102,9 +102,14 @@ class Query:
 
     @strawberry.field
     async def all_sales(self, info: Info) -> list[SaleType]:
-        """Retorna todas as vendas cadastradas."""
+        """Retorna todas as vendas cadastradas do usuário cadastrado."""
         db = info.context["db"]
-        result = await db.execute(select(Sale).options(selectinload(Sale.items)))
+        user = info.context["user"]
+        result = await db.execute(
+            select(Sale)
+            .options(selectinload(Sale.items))
+            .where(Sale.user_id == user.id)
+        )
         return [sale_model_to_type(s) for s in result.scalars()]
 
     @strawberry.field
