@@ -55,6 +55,7 @@ class ProductType:
     name: str
     slug: str
     description: str | None
+    stock: int
     sale_price: MoneyType
     cost_price: MoneyType
     promotional_price: MoneyType | None
@@ -76,6 +77,7 @@ class SaleType:
     """Tipo GraphQL para uma venda com seus itens."""
 
     id: int
+    user_id: int
     sale_date: datetime
     total_amount: float
     total_profit: float

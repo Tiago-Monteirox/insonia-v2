@@ -10,7 +10,12 @@ from app.graphql.queries import Query
 
 
 async def get_context(
-    db: AsyncSession = Depends(get_db),
+    # use_cache=False garante sessão própria para a lógica de negócio,
+    # separada da sessão que current_active_user usa internamente.
+    # Sem isso, ambos compartilham a mesma sessão (FastAPI cacheia get_db
+    # dentro do request) e db.begin() falha com "transaction already begun"
+    # porque o SELECT do auth já iniciou uma transação implícita.
+    db: AsyncSession = Depends(get_db, use_cache=False),
     user=Depends(current_active_user),
 ) -> dict:
     """Monta o contexto injetado em cada resolver GraphQL."""

@@ -21,11 +21,19 @@ class SaleItemInput:
 async def create_sale(
     db: AsyncSession, user_id: int, items: list[SaleItemInput]
 ) -> Sale:
-    """Cria uma venda atomicamente: verifica estoque e cria a venda automaticamente."""
-    async with db.begin():
+    """Cria uma venda atomicamente.
+
+    Usa begin_nested() (SAVEPOINT) quando já existe uma transação na sessão
+    — caso comum nos resolvers GraphQL onde current_active_user autobegin
+    antes de o resolver ser chamado — e commita a transação ao final.
+    """
+    already_in_txn = db.in_transaction()
+    ctx = db.begin_nested() if already_in_txn else db.begin()
+
+    async with ctx:
         sale = Sale(user_id=user_id)
         db.add(sale)
-        await db.flush()  # flush para obter sale.id sem commitar
+        await db.flush()
 
         total_amount = Decimal("0")
         total_profit = Decimal("0")
@@ -36,7 +44,7 @@ async def create_sale(
                     Product.id == item.product_id
                 )
             )
-            row = result.fetchone()
+            row = result.first()
             if row is None:
                 raise ValueError(f"Produto {item.product_id} não encontrado")
 
@@ -59,12 +67,24 @@ async def create_sale(
         sale.total_amount = total_amount
         sale.total_profit = total_profit
 
+    # Se usamos begin_nested(), ainda estamos na transação externa —
+    # commitamos para persistir a venda no banco.
+    if already_in_txn:
+        await db.commit()
+
     return sale
 
 
 async def remove_sale(db: AsyncSession, sale_id: int) -> None:
-    """Remove uma venda e restaura o estoque de todos os seus itens."""
-    async with db.begin():
+    """Remove uma venda e restaura o estoque de todos os seus itens.
+
+    Mesma lógica de begin_nested() que create_sale para funcionar tanto
+    em testes diretos quanto dentro de resolvers GraphQL.
+    """
+    already_in_txn = db.in_transaction()
+    ctx = db.begin_nested() if already_in_txn else db.begin()
+
+    async with ctx:
         result = await db.execute(
             select(Sale).options(selectinload(Sale.items)).where(Sale.id == sale_id)
         )
@@ -76,3 +96,6 @@ async def remove_sale(db: AsyncSession, sale_id: int) -> None:
             await increment_stock(db, item.product_id, item.quantity)
 
         await db.delete(sale)
+
+    if already_in_txn:
+        await db.commit()

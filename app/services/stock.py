@@ -27,13 +27,13 @@ async def decrement_stock_atomic(
         .values(stock=Product.stock - quantity)
         .returning(Product.stock)
     )
-    row = result.fetchone()
+    row = result.first()
     if row is None:
         # Produto não existe ou estoque insuficiente — verifica qual
         check = await db.execute(
             select(Product.stock, Product.id).where(Product.id == product_id)
         )
-        rec = check.fetchone()
+        rec = check.first()
         if rec is None:
             raise ValueError(f"Produto {product_id} não encontrado")
         raise ValueError(

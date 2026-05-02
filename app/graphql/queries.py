@@ -26,6 +26,7 @@ def product_model_to_type(p: Product) -> ProductType:
         name=p.name,
         slug=p.slug,
         description=p.description,
+        stock=p.stock,
         sale_price=MoneyType(amount=float(p.sale_price), currency=p.currency),
         cost_price=MoneyType(amount=float(p.cost_price), currency=p.currency),
         promotional_price=(
