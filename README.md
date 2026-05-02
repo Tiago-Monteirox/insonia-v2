@@ -25,13 +25,13 @@ O projeto entrega hoje:
 - `deleteSale` com verificação de posse
 - decremento de estoque atômico via `UPDATE ... RETURNING` (sem race condition)
 - rate limiting por IP no prefixo `/auth` via middleware ASGI
+- suíte de testes com 24 testes cobrindo serviços, mutations, auth e fluxo E2E
 - setup do Alembic em [`alembic.ini`](./alembic.ini) e [`migrations/`](./migrations)
 - PostgreSQL local via [`docker-compose.yml`](./docker-compose.yml)
 - dependências gerenciadas com `uv`
 
 O projeto ainda não entrega:
 
-- testes (veja Fase 3.5 e 4.6 em [`IMPL_GUIDE.md`](./IMPL_GUIDE.md))
 - CORS configurado
 - upload de imagens (Fase 5)
 - integração real com o frontend (Fase 6)
@@ -83,7 +83,13 @@ insonia-v2/
 ├── migrations/
 │   └── versions/
 │       └── 37d9af481f87_initial.py
-├── tests/                   # a implementar (veja IMPL_GUIDE.md Fase 3.5)
+├── tests/
+│   ├── conftest.py          # fixtures: db, product, user, client, auth_client
+│   ├── test_stock.py        # testes unitários do serviço de estoque
+│   ├── test_sale_service.py # testes unitários do serviço de venda
+│   ├── test_graphql_mutations.py  # testes das mutations GraphQL
+│   ├── test_auth.py         # testes do fluxo de autenticação
+│   └── test_e2e_pdv.py      # testes E2E do caminho crítico do PDV
 ├── .planning/
 │   └── codebase/            # mapa do codebase gerado por análise estática
 ├── alembic.ini
@@ -279,9 +285,34 @@ uv run alembic current
 | [`ROADMAP.md`](./ROADMAP.md) | Visão geral das fases do projeto |
 | [`.planning/codebase/`](./.planning/codebase/) | Mapa do codebase (stack, arquitetura, convenções, concerns) |
 
+## Testes
+
+O banco de testes precisa existir antes de rodar a suíte:
+
+```bash
+docker compose exec db psql -U insonia -c "CREATE DATABASE insonia_test;"
+```
+
+Rodar todos os testes:
+
+```bash
+uv run pytest tests/ -v
+```
+
+| Arquivo | Cobertura |
+|---------|-----------|
+| `test_stock.py` | `check_stock_atomic`, `decrement_stock_atomic`, `increment_stock` |
+| `test_sale_service.py` | `create_sale` (rollback em estoque insuficiente), `remove_sale` |
+| `test_graphql_mutations.py` | CRUD de produto, categoria, marca e venda via GraphQL |
+| `test_auth.py` | Register, login, rotas protegidas, token inválido |
+| `test_e2e_pdv.py` | Fluxo completo PDV: criar produto → vender → cancelar → verificar estoque |
+
+**Decisões de design dos testes:**
+- `NullPool` no engine de testes — evita reutilizar conexões asyncpg entre event loops distintos (`asyncio_default_fixture_loop_scope=function` cria um event loop por teste)
+- `TRUNCATE ... RESTART IDENTITY CASCADE` após cada teste — isolamento sem custo de `drop_all`/`create_all`
+- Fixtures `user` e `auth_client` criam superuser + JWT; cada request HTTP usa sessão própria
+
 ## Próximos passos
 
-1. Implementar testes de serviços — Fase 3.5 do [`IMPL_GUIDE.md`](./IMPL_GUIDE.md)
-2. Implementar testes das mutations GraphQL — Fase 4.6
-3. Upload de imagens — Fase 5
-4. Conectar frontend — Fase 6
+1. Upload de imagens — Fase 5
+2. Conectar frontend — Fase 6
