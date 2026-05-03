@@ -3,15 +3,29 @@ from decimal import Decimal
 import strawberry
 from slugify import slugify
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from strawberry.types import Info
 
-from app.graphql.inputs import BrandInput, CategoryInput, ProductInput
+from app.graphql.inputs import (
+    BrandInput,
+    CategoryInput,
+    ProductInput,
+    VariationNameInput,
+    VariationValueInput,
+)
 from app.graphql.queries import product_model_to_type
-from app.graphql.types import BrandType, CategoryType, ProductType
+from app.graphql.types import (
+    BrandType,
+    CategoryType,
+    ProductType,
+    VariationNameType,
+    VariationValueType,
+)
 from app.models.brand import Brand
 from app.models.category import Category
 from app.models.product import Product
 from app.models.sale import Sale
+from app.models.variation import VariationName, VariationValue
 from app.services.sale import create_sale as svc_create_sale
 from app.services.sale import remove_sale
 
@@ -251,6 +265,66 @@ class Mutation:
                 "Marca não encontrada"
             )
         await db.delete(brand)
+        await db.commit()
+        return True
+
+    # --- Variações ---
+
+    @strawberry.mutation
+    async def create_variation_name(
+        self, info: Info, input: VariationNameInput
+    ) -> VariationNameType:
+        """Cria uma dimensão de variação (ex: Tamanho, Cor)."""
+        db = info.context["db"]
+        vn = VariationName(name=input.name)
+        db.add(vn)
+        await db.commit()
+        await db.refresh(vn)
+        return VariationNameType(id=vn.id, name=vn.name, values=[])
+
+    @strawberry.mutation
+    async def add_variation_value(
+        self, info: Info, input: VariationValueInput
+    ) -> VariationNameType:
+        """Adiciona um valor a uma dimensão existente. Retorna a dimensão atualizada."""
+        db = info.context["db"]
+        vv = VariationValue(name_id=input.name_id, value=input.value)
+        db.add(vv)
+        await db.commit()
+
+        result = await db.execute(
+            select(VariationName)
+            .options(selectinload(VariationName.values))
+            .where(VariationName.id == input.name_id)
+        )
+        vn = result.scalar_one()
+        return VariationNameType(
+            id=vn.id,
+            name=vn.name,
+            values=[VariationValueType(id=v.id, value=v.value) for v in vn.values],
+        )
+
+    @strawberry.mutation
+    async def delete_variation_name(self, info: Info, id: int) -> bool:
+        """Remove uma dimensão de variação e todos os seus valores."""
+        db = info.context["db"]
+        result = await db.execute(select(VariationName).where(VariationName.id == id))
+        vn = result.scalar_one_or_none()
+        if vn is None:
+            raise strawberry.exceptions.GraphQLError("Dimensão não encontrada")
+        await db.delete(vn)
+        await db.commit()
+        return True
+
+    @strawberry.mutation
+    async def delete_variation_value(self, info: Info, id: int) -> bool:
+        """Remove um valor de variação pelo ID."""
+        db = info.context["db"]
+        result = await db.execute(select(VariationValue).where(VariationValue.id == id))
+        vv = result.scalar_one_or_none()
+        if vv is None:
+            raise strawberry.exceptions.GraphQLError("Valor não encontrado")
+        await db.delete(vv)
         await db.commit()
         return True
 

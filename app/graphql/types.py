@@ -5,20 +5,20 @@ import strawberry
 
 
 @strawberry.type
-class VaritionNameType:
-    """Tipo GraphQL para nome de variação de produto."""
-
-    id: int
-    name: str
-
-
-@strawberry.type
 class VariationValueType:
-    """Tipo GraphQL para valor concreto de um atributo de variação."""
+    """Tipo GraphQL para valor concreto de uma variação (ex: M, Azul)."""
 
     id: int
     value: str
-    variation_name: VaritionNameType
+
+
+@strawberry.type
+class VariationNameType:
+    """Tipo GraphQL para nome de variação com seus valores (ex: Tamanho → [P, M, G])."""
+
+    id: int
+    name: str
+    values: list[VariationValueType]
 
 
 @strawberry.type
@@ -59,6 +59,8 @@ class ProductType:
     sale_price: MoneyType
     cost_price: MoneyType
     promotional_price: MoneyType | None
+    category_id: int | None
+    brand_id: int | None
 
 
 @strawberry.type
@@ -82,3 +84,31 @@ class SaleType:
     total_amount: float
     total_profit: float
     items: list[SaleItemType]
+
+
+@strawberry.type
+class DailyRevenuePoint:
+    """Ponto do gráfico de faturamento diário."""
+
+    date: str
+    total: float
+
+
+@strawberry.type
+class TopProductItem:
+    """Produto no ranking de mais vendidos."""
+
+    product_id: int
+    name: str
+    units_sold: int
+    revenue: float
+
+
+@strawberry.type
+class SalesSummary:
+    """Totais agregados para um período."""
+
+    total_revenue: float
+    total_profit: float
+    sale_count: int
+    avg_ticket: float

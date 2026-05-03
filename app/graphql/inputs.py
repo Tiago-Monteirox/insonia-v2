@@ -28,3 +28,18 @@ class BrandInput:
     """Input para criação ou atualização de marca."""
 
     name: str
+
+
+@strawberry.input
+class VariationNameInput:
+    """Input para criar ou renomear uma dimensão de variação."""
+
+    name: str
+
+
+@strawberry.input
+class VariationValueInput:
+    """Input para adicionar um valor a uma dimensão existente."""
+
+    name_id: int
+    value: str

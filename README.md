@@ -48,18 +48,19 @@ insonia-v2/
 │   │   └── stock.py            # decrement_stock_atomic, increment_stock
 │   └── main.py                 # entrypoint — rotas, middlewares, static files
 ├── insonia-frontend/
-│   ├── ui_kits/insonia_app/    # app principal (React CDN)
-│   │   ├── index.html          # App root, auth flow
-│   │   ├── api.js              # cliente GraphQL + auth (insApi)
-│   │   ├── data.js             # dados mock (usados enquanto wiring não concluído)
-│   │   ├── Dashboard.jsx
-│   │   ├── PDV.jsx
-│   │   ├── Produtos.jsx
-│   │   ├── Historico.jsx
-│   │   ├── Screens.jsx         # Login, Categorias, Marcas, Variacoes
-│   │   └── Sidebar.jsx
-│   ├── colors_and_type.css     # variáveis de design system
-│   ├── AUTH_SCREENS_SPEC.md    # spec das telas de auth (login, recuperação, Google OAuth)
+│   ├── Insonia Design System/vite-export/   # app Vite (produção)
+│   │   ├── src/
+│   │   │   ├── lib/api.js          # cliente GraphQL + auth
+│   │   │   ├── components/         # AppLayout (Sidebar + Topbar), ProtectedRoute
+│   │   │   ├── pages/              # Dashboard, PDV, Produtos, Categorias, Marcas,
+│   │   │   │                       # Variacoes, Historico, Estatisticas
+│   │   │   ├── pages/auth/         # Login, ForgotPassword, ResetPassword, OAuthCallback
+│   │   │   └── styles/             # colors_and_type.css, app.css
+│   │   ├── .env                    # VITE_API_BASE=http://localhost:8000
+│   │   └── package.json
+│   ├── ui_kits/insonia_app/    # kit de UI (protótipo CDN, referência de design)
+│   ├── colors_and_type.css     # variáveis de design system (fonte do kit)
+│   ├── AUTH_SCREENS_SPEC.md    # spec das telas de auth
 │   └── README.md               # design system — cores, tipografia, componentes
 ├── migrations/
 ├── tests/
@@ -106,12 +107,12 @@ Backend disponível em:
 - `http://localhost:8000/graphql` — GraphiQL
 
 ```bash
-# 5. Subir o frontend (em outro terminal)
-cd insonia-frontend
-python3 -m http.server 5500
+# 5. Subir o frontend Vite (em outro terminal)
+cd "insonia-frontend/Insonia Design System/vite-export"
+npm run dev
 ```
 
-Frontend disponível em `http://localhost:5500/ui_kits/insonia_app/`
+Frontend disponível em `http://localhost:5173`
 
 ## Variáveis de ambiente
 

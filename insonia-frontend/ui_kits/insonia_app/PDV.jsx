@@ -1,10 +1,50 @@
 // PDV — Registrar venda
 function PDV() {
+  const [produtos, setProdutos] = React.useState([]);
+  const [categorias, setCategorias] = React.useState([]);
   const [cart, setCart] = React.useState([]);
   const [filter, setFilter] = React.useState(0);
   const [toast, setToast] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => { if (window.lucide) lucide.createIcons(); });
+
+  React.useEffect(() => {
+    async function load() {
+      try {
+        const [prodData, catData] = await Promise.all([
+          insApi.gql(`{ allProducts(limit: 200) {
+            id name slug stock currency categoryId
+            salePrice { amount } costPrice { amount }
+          }}`),
+          insApi.gql(`{ allCategories { id name slug } }`),
+        ]);
+        setProdutos(prodData.allProducts.map(p => ({
+          id: p.id,
+          name: p.name,
+          slug: p.slug,
+          quantidade: p.stock,
+          preco_venda: p.salePrice.amount,
+          preco_custo: p.costPrice.amount,
+          currency: p.currency,
+          letra: p.name[0].toUpperCase(),
+          categoria: p.categoryId,
+        })));
+        setCategorias(catData.allCategories);
+      } catch (err) {
+        setToast('Erro ao carregar produtos: ' + err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) return (
+    <div className="content" style={{display:'flex', alignItems:'center', justifyContent:'center', height:'60vh'}}>
+      <div style={{color:'var(--ins-fg-muted)'}}>Carregando produtos…</div>
+    </div>
+  );
 
   const filtered = filter === 0 ? produtos : produtos.filter(p => p.categoria === filter);
 
@@ -18,11 +58,30 @@ function PDV() {
   };
   const updateQty = (id, delta) => setCart(c => c.map(i => i.id === id ? {...i, qty: Math.max(1, Math.min(i.qty+delta, i.quantidade))} : i));
   const removeItem = (id) => setCart(c => c.filter(i => i.id !== id));
-  const finalizar = () => {
+
+  const finalizar = async () => {
     if (cart.length === 0) return;
-    setToast(`Venda #${235 + Math.floor(Math.random()*5)} registrada`);
-    setCart([]);
-    setTimeout(() => setToast(null), 2500);
+    try {
+      const itemsGql = cart.map(i => `{ productId: ${i.id}, quantity: ${i.qty} }`).join(', ');
+      const data = await insApi.gql(`
+        mutation {
+          createSale(items: [${itemsGql}]) {
+            id totalAmount totalProfit
+          }
+        }
+      `);
+      const sale = data.createSale;
+      setToast(`Venda #${sale.id} registrada — ${fmtBRL(sale.totalAmount)}`);
+      const cartSnapshot = cart;
+      setCart([]);
+      setProdutos(prev => prev.map(p => {
+        const item = cartSnapshot.find(i => i.id === p.id);
+        return item ? { ...p, quantidade: p.quantidade - item.qty } : p;
+      }));
+    } catch (err) {
+      setToast('Erro: ' + err.message);
+    }
+    setTimeout(() => setToast(null), 3000);
   };
 
   const subtotal = cart.reduce((s, i) => s + i.preco_venda * i.qty, 0);
@@ -66,7 +125,7 @@ function PDV() {
               <div key={i.id} className="cart-item">
                 <div>
                   <div className="name">{i.name}</div>
-                  <div className="sub">{fmtBRL(i.preco_venda)} · {i.sku}</div>
+                  <div className="sub">{fmtBRL(i.preco_venda)}</div>
                 </div>
                 <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6}}>
                   <div className="qty-stepper">

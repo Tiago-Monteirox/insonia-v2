@@ -56,12 +56,60 @@ function Login({ onLogin }) {
 }
 
 function Categorias() {
+  const [categorias, setCategorias] = React.useState([]);
+  const [nome, setNome] = React.useState('');
+  const [editando, setEditando] = React.useState(null); // { id, name }
+  const [saving, setSaving] = React.useState(false);
   React.useEffect(() => { if (window.lucide) lucide.createIcons(); });
+
+  async function load() {
+    const data = await insApi.gql(`{ allCategories { id name slug } }`);
+    setCategorias(data.allCategories);
+  }
+  React.useEffect(() => { load(); }, []);
+
+  async function salvar(e) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editando) {
+        await insApi.gql(`mutation { updateCategory(id: ${editando.id}, input: { name: "${nome}" }) { id } }`);
+        setEditando(null);
+      } else {
+        await insApi.gql(`mutation { createCategory(input: { name: "${nome}" }) { id } }`);
+      }
+      setNome('');
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function iniciarEdicao(c) {
+    setEditando(c);
+    setNome(c.name);
+  }
+
+  async function excluir(id) {
+    if (!confirm('Excluir esta categoria?')) return;
+    await insApi.gql(`mutation { deleteCategory(id: ${id}) }`);
+    setCategorias(prev => prev.filter(c => c.id !== id));
+  }
+
   return (
     <div className="content">
       <div className="page-header">
         <div><h1>Categorias</h1><div className="sub">{categorias.length} categorias</div></div>
-        <button className="btn primary"><i data-lucide="plus"></i>Nova categoria</button>
+      </div>
+      <div className="card" style={{marginBottom:20}}>
+        <form className="card-body" style={{display:'flex',gap:12,alignItems:'flex-end'}} onSubmit={salvar}>
+          <div className="field" style={{flex:1,margin:0}}>
+            <label>{editando ? 'Editar categoria' : 'Nova categoria'}</label>
+            <input className="input" value={nome} onChange={e=>setNome(e.target.value)} required placeholder="Ex: Calçados" />
+          </div>
+          <button className="btn primary" disabled={saving}>{saving ? 'Salvando…' : editando ? 'Atualizar' : 'Adicionar'}</button>
+          {editando && <button type="button" className="btn secondary" onClick={() => { setEditando(null); setNome(''); }}>Cancelar</button>}
+        </form>
       </div>
       <div className="tbl-wrap">
         <table className="tbl">
@@ -70,11 +118,11 @@ function Categorias() {
             {categorias.map(c => (
               <tr key={c.id}>
                 <td style={{fontWeight:500}}>{c.name}</td>
-                <td><span className="price" style={{color:'var(--ins-fg-muted)', fontSize:12}}>/{c.slug}</span></td>
-                <td className="num">{produtos.filter(p=>p.categoria===c.id).length}</td>
+                <td><span className="price" style={{color:'var(--ins-fg-muted)',fontSize:12}}>/{c.slug}</span></td>
+                <td className="num">—</td>
                 <td className="actions">
-                  <button className="btn ghost sm icon-only"><i data-lucide="pencil"></i></button>
-                  <button className="btn ghost sm icon-only"><i data-lucide="trash-2"></i></button>
+                  <button className="btn ghost sm icon-only" onClick={() => iniciarEdicao(c)}><i data-lucide="pencil"></i></button>
+                  <button className="btn ghost sm icon-only" onClick={() => excluir(c.id)}><i data-lucide="trash-2"></i></button>
                 </td>
               </tr>
             ))}
@@ -86,23 +134,68 @@ function Categorias() {
 }
 
 function Marcas() {
+  const [marcas, setMarcas] = React.useState([]);
+  const [nome, setNome] = React.useState('');
+  const [editando, setEditando] = React.useState(null);
+  const [saving, setSaving] = React.useState(false);
   React.useEffect(() => { if (window.lucide) lucide.createIcons(); });
+
+  async function load() {
+    const data = await insApi.gql(`{ allBrands { id name slug } }`);
+    setMarcas(data.allBrands);
+  }
+  React.useEffect(() => { load(); }, []);
+
+  async function salvar(e) {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      if (editando) {
+        await insApi.gql(`mutation { updateBrand(id: ${editando.id}, input: { name: "${nome}" }) { id } }`);
+        setEditando(null);
+      } else {
+        await insApi.gql(`mutation { createBrand(input: { name: "${nome}" }) { id } }`);
+      }
+      setNome('');
+      await load();
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function excluir(id) {
+    if (!confirm('Excluir esta marca?')) return;
+    await insApi.gql(`mutation { deleteBrand(id: ${id}) }`);
+    setMarcas(prev => prev.filter(m => m.id !== id));
+  }
+
   return (
     <div className="content">
       <div className="page-header">
         <div><h1>Marcas</h1><div className="sub">{marcas.length} marcas</div></div>
-        <button className="btn primary"><i data-lucide="plus"></i>Nova marca</button>
+      </div>
+      <div className="card" style={{marginBottom:20}}>
+        <form className="card-body" style={{display:'flex',gap:12,alignItems:'flex-end'}} onSubmit={salvar}>
+          <div className="field" style={{flex:1,margin:0}}>
+            <label>{editando ? 'Editar marca' : 'Nova marca'}</label>
+            <input className="input" value={nome} onChange={e=>setNome(e.target.value)} required placeholder="Ex: Nike" />
+          </div>
+          <button className="btn primary" disabled={saving}>{saving ? 'Salvando…' : editando ? 'Atualizar' : 'Adicionar'}</button>
+          {editando && <button type="button" className="btn secondary" onClick={() => { setEditando(null); setNome(''); }}>Cancelar</button>}
+        </form>
       </div>
       <div className="grid-4">
         {marcas.map(m => (
           <div className="card" key={m.id}>
-            <div className="card-body" style={{display:'flex', alignItems:'center', gap:12}}>
-              <div className="thumb-sm" style={{width:44, height:44, fontSize:16}}>{m.name[0]}</div>
+            <div className="card-body" style={{display:'flex',alignItems:'center',gap:12}}>
+              <div className="thumb-sm" style={{width:44,height:44,fontSize:16}}>{m.name[0]}</div>
               <div style={{flex:1}}>
                 <div style={{fontWeight:600}}>{m.name}</div>
-                <div style={{fontSize:12, color:'var(--ins-fg-muted)'}}>{produtos.filter(p=>p.marca===m.id).length} produtos</div>
               </div>
-              <button className="btn ghost sm icon-only"><i data-lucide="more-horizontal"></i></button>
+              <div style={{display:'flex',gap:4}}>
+                <button className="btn ghost sm icon-only" onClick={() => { setEditando(m); setNome(m.name); }}><i data-lucide="pencil"></i></button>
+                <button className="btn ghost sm icon-only" onClick={() => excluir(m.id)}><i data-lucide="trash-2"></i></button>
+              </div>
             </div>
           </div>
         ))}
@@ -112,25 +205,82 @@ function Marcas() {
 }
 
 function Variacoes() {
+  const [dims, setDims] = React.useState([]);
+  const [nomeDim, setNomeDim] = React.useState('');
+  const [novoValor, setNovoValor] = React.useState({}); // { [nameId]: string }
   React.useEffect(() => { if (window.lucide) lucide.createIcons(); });
-  const dims = [
-    { name: 'Tamanho', valores: ['PP','P','M','G','GG','XG'] },
-    { name: 'Cor', valores: ['Preto','Branco','Azul','Vermelho','Verde','Cinza'] },
-    { name: 'Numeração', valores: ['38','39','40','41','42','43','44'] },
-  ];
+
+  async function load() {
+    const data = await insApi.gql(`{
+      allVariationNames { id name values { id value } }
+    }`);
+    setDims(data.allVariationNames);
+  }
+  React.useEffect(() => { load(); }, []);
+
+  async function criarDim(e) {
+    e.preventDefault();
+    await insApi.gql(`mutation { createVariationName(input: { name: "${nomeDim}" }) { id } }`);
+    setNomeDim('');
+    await load();
+  }
+
+  async function adicionarValor(nameId) {
+    const val = novoValor[nameId]?.trim();
+    if (!val) return;
+    await insApi.gql(`mutation { addVariationValue(input: { nameId: ${nameId}, value: "${val}" }) { id } }`);
+    setNovoValor(v => ({ ...v, [nameId]: '' }));
+    await load();
+  }
+
+  async function excluirValor(id) {
+    await insApi.gql(`mutation { deleteVariationValue(id: ${id}) }`);
+    await load();
+  }
+
+  async function excluirDim(id) {
+    if (!confirm('Excluir esta dimensão e todos os valores?')) return;
+    await insApi.gql(`mutation { deleteVariationName(id: ${id}) }`);
+    await load();
+  }
+
   return (
     <div className="content">
       <div className="page-header">
         <div><h1>Variações</h1><div className="sub">Dimensões de variação de produto</div></div>
-        <button className="btn primary"><i data-lucide="plus"></i>Nova dimensão</button>
       </div>
-      <div style={{display:'flex', flexDirection:'column', gap:16}}>
+      <div className="card" style={{marginBottom:20}}>
+        <form className="card-body" style={{display:'flex',gap:12,alignItems:'flex-end'}} onSubmit={criarDim}>
+          <div className="field" style={{flex:1,margin:0}}>
+            <label>Nova dimensão</label>
+            <input className="input" value={nomeDim} onChange={e=>setNomeDim(e.target.value)} required placeholder="Ex: Tamanho" />
+          </div>
+          <button className="btn primary">Adicionar</button>
+        </form>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:16}}>
         {dims.map(d => (
-          <div className="card" key={d.name}>
-            <div className="card-header"><h2>{d.name}</h2><span className="badge neutral">{d.valores.length} valores</span></div>
-            <div className="card-body" style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-              {d.valores.map(v => <span key={v} className="chip">{v}</span>)}
-              <button className="chip" style={{borderStyle:'dashed', color:'var(--ins-fg-muted)'}}>+ adicionar</button>
+          <div className="card" key={d.id}>
+            <div className="card-header">
+              <h2>{d.name}</h2>
+              <span className="badge neutral">{d.values.length} valores</span>
+              <button className="btn ghost sm icon-only" style={{marginLeft:'auto'}} onClick={() => excluirDim(d.id)}><i data-lucide="trash-2"></i></button>
+            </div>
+            <div className="card-body" style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+              {d.values.map(v => (
+                <span key={v.id} className="chip" style={{display:'flex',alignItems:'center',gap:4}}>
+                  {v.value}
+                  <button style={{background:'none',border:'none',cursor:'pointer',padding:0,lineHeight:1,color:'var(--ins-fg-muted)'}} onClick={() => excluirValor(v.id)}>×</button>
+                </span>
+              ))}
+              <input
+                className="input"
+                style={{width:100,height:32,fontSize:13}}
+                placeholder="+ valor"
+                value={novoValor[d.id] || ''}
+                onChange={e => setNovoValor(v => ({ ...v, [d.id]: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); adicionarValor(d.id); } }}
+              />
             </div>
           </div>
         ))}
