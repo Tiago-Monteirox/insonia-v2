@@ -1,0 +1,190 @@
+/* ============================================================
+   Insonia Design System — Colors & Type
+   Fresh modern SaaS, neutral + one accent, comfortable density.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* ---------- Neutrals (slate, warm-cool balanced) ---------- */
+  --ins-neutral-0:   #ffffff;
+  --ins-neutral-50:  #f8fafc;
+  --ins-neutral-100: #f1f5f9;
+  --ins-neutral-200: #e2e8f0;
+  --ins-neutral-300: #cbd5e1;
+  --ins-neutral-400: #94a3b8;
+  --ins-neutral-500: #64748b;
+  --ins-neutral-600: #475569;
+  --ins-neutral-700: #334155;
+  --ins-neutral-800: #1e293b;
+  --ins-neutral-900: #0f172a;
+  --ins-neutral-950: #020617;
+
+  /* ---------- Accent (single accent — muted teal, evolved from backend's #01a9ac) ---------- */
+  --ins-accent-50:  #effefc;
+  --ins-accent-100: #c7fbf5;
+  --ins-accent-200: #90f5ec;
+  --ins-accent-300: #52e7dd;
+  --ins-accent-400: #22cec7;
+  --ins-accent-500: #0ab3ae;   /* primary */
+  --ins-accent-600: #068e8d;
+  --ins-accent-700: #0a7172;
+  --ins-accent-800: #0e595c;
+  --ins-accent-900: #104a4c;
+
+  /* ---------- Semantic ---------- */
+  --ins-success-50:  #ecfdf5;
+  --ins-success-500: #10b981;
+  --ins-success-700: #047857;
+
+  --ins-warning-50:  #fffbeb;
+  --ins-warning-500: #f59e0b;
+  --ins-warning-700: #b45309;
+
+  --ins-danger-50:   #fef2f2;
+  --ins-danger-500:  #ef4444;
+  --ins-danger-700:  #b91c1c;
+
+  --ins-info-50:     #eff6ff;
+  --ins-info-500:    #3b82f6;
+  --ins-info-700:    #1d4ed8;
+
+  /* ---------- Semantic tokens (foreground / background) ---------- */
+  --ins-bg:         var(--ins-neutral-50);
+  --ins-surface:    var(--ins-neutral-0);
+  --ins-surface-2:  var(--ins-neutral-100);
+  --ins-border:     var(--ins-neutral-200);
+  --ins-border-strong: var(--ins-neutral-300);
+
+  --ins-fg:         var(--ins-neutral-900);
+  --ins-fg-muted:   var(--ins-neutral-600);
+  --ins-fg-subtle:  var(--ins-neutral-400);
+  --ins-fg-onaccent: var(--ins-neutral-0);
+
+  --ins-accent:     var(--ins-accent-500);
+  --ins-accent-hover: var(--ins-accent-600);
+  --ins-accent-soft: var(--ins-accent-50);
+
+  /* ---------- Typography ---------- */
+  --ins-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ins-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --ins-text-xs:   12px;
+  --ins-text-sm:   13px;
+  --ins-text-base: 14px;
+  --ins-text-md:   15px;
+  --ins-text-lg:   17px;
+  --ins-text-xl:   20px;
+  --ins-text-2xl:  24px;
+  --ins-text-3xl:  30px;
+  --ins-text-4xl:  36px;
+  --ins-text-display: 48px;
+
+  --ins-leading-tight:  1.2;
+  --ins-leading-normal: 1.5;
+  --ins-leading-relaxed: 1.65;
+
+  --ins-tracking-tight: -0.02em;
+  --ins-tracking-normal: 0;
+  --ins-tracking-wide: 0.04em;
+
+  /* ---------- Spacing (4px base) ---------- */
+  --ins-space-1:  4px;
+  --ins-space-2:  8px;
+  --ins-space-3:  12px;
+  --ins-space-4:  16px;
+  --ins-space-5:  20px;
+  --ins-space-6:  24px;
+  --ins-space-8:  32px;
+  --ins-space-10: 40px;
+  --ins-space-12: 48px;
+  --ins-space-16: 64px;
+
+  /* ---------- Radii ---------- */
+  --ins-radius-xs: 4px;
+  --ins-radius-sm: 6px;
+  --ins-radius-md: 8px;
+  --ins-radius-lg: 12px;
+  --ins-radius-xl: 16px;
+  --ins-radius-full: 9999px;
+
+  /* ---------- Shadows (low, realistic) ---------- */
+  --ins-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ins-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.08);
+  --ins-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --ins-shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.08);
+  --ins-shadow-xl: 0 20px 25px -5px rgba(15, 23, 42, 0.10), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  --ins-shadow-focus: 0 0 0 3px rgba(10, 179, 174, 0.25);
+
+  /* ---------- Hit targets (touch-friendly) ---------- */
+  --ins-hit-sm: 36px;
+  --ins-hit-md: 44px;   /* default — touch-friendly */
+  --ins-hit-lg: 56px;   /* PDV primary actions */
+
+  /* ---------- Motion ---------- */
+  --ins-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ins-dur-fast: 120ms;
+  --ins-dur-med: 200ms;
+  --ins-dur-slow: 320ms;
+}
+
+/* ---------- Base styles (semantic) ---------- */
+body {
+  font-family: var(--ins-font-sans);
+  font-size: var(--ins-text-base);
+  line-height: var(--ins-leading-normal);
+  color: var(--ins-fg);
+  background: var(--ins-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, .ins-h1 {
+  font-family: var(--ins-font-sans);
+  font-size: var(--ins-text-3xl);
+  font-weight: 700;
+  line-height: var(--ins-leading-tight);
+  letter-spacing: var(--ins-tracking-tight);
+  color: var(--ins-fg);
+}
+h2, .ins-h2 {
+  font-size: var(--ins-text-2xl);
+  font-weight: 600;
+  line-height: var(--ins-leading-tight);
+  letter-spacing: var(--ins-tracking-tight);
+}
+h3, .ins-h3 {
+  font-size: var(--ins-text-xl);
+  font-weight: 600;
+  line-height: var(--ins-leading-tight);
+}
+h4, .ins-h4 {
+  font-size: var(--ins-text-lg);
+  font-weight: 600;
+}
+p, .ins-p {
+  font-size: var(--ins-text-base);
+  line-height: var(--ins-leading-normal);
+  color: var(--ins-fg);
+}
+small, .ins-small {
+  font-size: var(--ins-text-sm);
+  color: var(--ins-fg-muted);
+}
+.ins-caption {
+  font-size: var(--ins-text-xs);
+  color: var(--ins-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: var(--ins-tracking-wide);
+  font-weight: 600;
+}
+code, .ins-code, .ins-mono {
+  font-family: var(--ins-font-mono);
+  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
+}
+.ins-price {
+  font-family: var(--ins-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
