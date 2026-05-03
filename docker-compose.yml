@@ -4,11 +4,22 @@ services:
     environment:
       POSTGRES_DB: insonia
       POSTGRES_USER: insonia
-      POSTGRES_PASSWORD: insonia
-    ports:
-      - "5432:5432"
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://insonia:${DB_PASSWORD}@db:5432/insonia
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: "false"
+    depends_on:
+      - db
+    command: >
+      sh -c "uv run alembic upgrade head && uv run uvicorn main:app --host 0.0.0.0 --port 8000"
 
 volumes:
   postgres_data:
