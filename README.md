@@ -1,40 +1,6 @@
 # Insonia v2
 
-Reconstrução do backend do Insonia com FastAPI, SQLAlchemy async, PostgreSQL e Strawberry GraphQL.
-
-O frontend já existe em [`insonia-frontend/`](./insonia-frontend). O backend entrega autenticação JWT,
-domínio completo de produtos/categorias/marcas/vendas via GraphQL, serviços de estoque com atomicidade,
-rate limiting nos endpoints de auth e um schema GraphQL completo montado no FastAPI.
-
-## Estado atual
-
-O projeto entrega hoje:
-
-- aplicação FastAPI com auth e GraphQL em [`app/main.py`](./app/main.py)
-- endpoint `GET /health`
-- configuração central via `.env` em [`app/core/config.py`](./app/core/config.py)
-- engine e session factory async do SQLAlchemy em [`app/core/database.py`](./app/core/database.py)
-- modelos SQLAlchemy do domínio completo em [`app/models/`](./app/models)
-- geração automática de slug para entidades com nome via `SlugMixin`
-- autenticação JWT com `fastapi-users` — secrets separados para JWT, reset e verificação
-- usuário autenticado injetado no contexto de cada resolver GraphQL
-- schema GraphQL com CRUD completo de produto, categoria, marca e venda em [`app/graphql/`](./app/graphql)
-- queries de lista com paginação (`limit` / `offset`)
-- `allSales` filtrado pelo usuário autenticado
-- mutations de produto/categoria/marca restritas a superusuários
-- `deleteSale` com verificação de posse
-- decremento de estoque atômico via `UPDATE ... RETURNING` (sem race condition)
-- rate limiting por IP no prefixo `/auth` via middleware ASGI
-- suíte de testes com 24 testes cobrindo serviços, mutations, auth e fluxo E2E
-- setup do Alembic em [`alembic.ini`](./alembic.ini) e [`migrations/`](./migrations)
-- PostgreSQL local via [`docker-compose.yml`](./docker-compose.yml)
-- dependências gerenciadas com `uv`
-
-O projeto ainda não entrega:
-
-- CORS configurado
-- upload de imagens (Fase 5)
-- integração real com o frontend (Fase 6)
+Sistema de gestão de loja e ponto de venda. Backend em FastAPI + GraphQL, frontend em React (CDN) com design system próprio.
 
 ## Stack
 
@@ -45,9 +11,9 @@ O projeto ainda não entrega:
 | Banco de dados | PostgreSQL 16 |
 | GraphQL | Strawberry |
 | Auth | fastapi-users + JWT |
-| Validação | Pydantic v2 |
 | Migrations | Alembic |
 | Gerenciador de pacotes | uv |
+| Frontend | React 18 (CDN) + Babel standalone |
 
 ## Estrutura
 
@@ -55,50 +21,60 @@ O projeto ainda não entrega:
 insonia-v2/
 ├── app/
 │   ├── core/
-│   │   ├── auth.py          # fastapi-users, JWT strategy, secrets separados
-│   │   ├── config.py        # variáveis de ambiente via python-decouple
-│   │   └── database.py      # engine async, session factory, Base
+│   │   ├── auth.py             # fastapi-users, JWT strategy
+│   │   ├── config.py           # variáveis de ambiente via python-decouple
+│   │   └── database.py         # engine async, session factory, Base
 │   ├── graphql/
-│   │   ├── inputs.py        # ProductInput, CategoryInput, BrandInput
-│   │   ├── mutations.py     # CRUD de produto, categoria, marca, venda
-│   │   ├── queries.py       # queries de listagem (paginadas) e busca por ID
-│   │   ├── schema.py        # montagem do schema + contexto (db, user)
-│   │   └── types.py         # tipos GraphQL do domínio
+│   │   ├── inputs.py           # ProductInput, CategoryInput, BrandInput, VariationInputs
+│   │   ├── mutations.py        # CRUD de produto, categoria, marca, variação e venda
+│   │   ├── queries.py          # listagem paginada, agregações de dashboard
+│   │   ├── schema.py           # montagem do schema + contexto (db, user)
+│   │   └── types.py            # tipos GraphQL do domínio
 │   ├── models/
 │   │   ├── brand.py
 │   │   ├── category.py
-│   │   ├── mixins.py        # SlugMixin (auto-slug via eventos SQLAlchemy)
-│   │   ├── product.py       # Product + ProductImage
-│   │   ├── sale.py          # Sale + SaleItem
+│   │   ├── mixins.py           # SlugMixin (auto-slug via eventos SQLAlchemy)
+│   │   ├── product.py          # Product + ProductImage
+│   │   ├── sale.py             # Sale + SaleItem
 │   │   ├── user.py
-│   │   └── variation.py     # VariationName, VariationValue, Variation
+│   │   └── variation.py        # VariationName, VariationValue, Variation
 │   ├── routers/
-│   │   └── auth_rate_limit.py  # AuthRateLimitMiddleware (sliding window por IP)
+│   │   ├── auth_rate_limit.py  # AuthRateLimitMiddleware (sliding window por IP)
+│   │   └── images.py           # upload de imagens de produto
 │   ├── schemas/
-│   │   └── user.py          # UserRead, UserCreate, UserUpdate
+│   │   └── user.py             # UserRead, UserCreate, UserUpdate
 │   ├── services/
-│   │   ├── sale.py          # create_sale (atômico), remove_sale
-│   │   └── stock.py         # decrement_stock_atomic, increment_stock
-│   └── main.py              # entrypoint da API
+│   │   ├── sale.py             # create_sale (atômico), remove_sale
+│   │   └── stock.py            # decrement_stock_atomic, increment_stock
+│   └── main.py                 # entrypoint — rotas, middlewares, static files
+├── insonia-frontend/
+│   ├── ui_kits/insonia_app/    # app principal (React CDN)
+│   │   ├── index.html          # App root, auth flow
+│   │   ├── api.js              # cliente GraphQL + auth (insApi)
+│   │   ├── data.js             # dados mock (usados enquanto wiring não concluído)
+│   │   ├── Dashboard.jsx
+│   │   ├── PDV.jsx
+│   │   ├── Produtos.jsx
+│   │   ├── Historico.jsx
+│   │   ├── Screens.jsx         # Login, Categorias, Marcas, Variacoes
+│   │   └── Sidebar.jsx
+│   ├── colors_and_type.css     # variáveis de design system
+│   ├── AUTH_SCREENS_SPEC.md    # spec das telas de auth (login, recuperação, Google OAuth)
+│   └── README.md               # design system — cores, tipografia, componentes
 ├── migrations/
-│   └── versions/
-│       └── 37d9af481f87_initial.py
 ├── tests/
-│   ├── conftest.py          # fixtures: db, product, user, client, auth_client
-│   ├── test_stock.py        # testes unitários do serviço de estoque
-│   ├── test_sale_service.py # testes unitários do serviço de venda
-│   ├── test_graphql_mutations.py  # testes das mutations GraphQL
-│   ├── test_auth.py         # testes do fluxo de autenticação
-│   └── test_e2e_pdv.py      # testes E2E do caminho crítico do PDV
-├── .planning/
-│   └── codebase/            # mapa do codebase gerado por análise estática
+│   ├── conftest.py
+│   ├── test_stock.py
+│   ├── test_sale_service.py
+│   ├── test_graphql_mutations.py
+│   ├── test_auth.py
+│   └── test_e2e_pdv.py
 ├── alembic.ini
 ├── docker-compose.yml
-├── FIXES_GUIDE.md           # bugs e dívida técnica (concluído)
-├── IMPL_GUIDE.md            # passo a passo completo de implementação
-├── ROADMAP.md               # fases do projeto
-├── pyproject.toml
-└── uv.lock
+├── IMPL_GUIDE.md               # guia de implementação das fases 0–9
+├── WIRING_GUIDE.md             # guia de wiring frontend ↔ backend (fases 1–8)
+├── TODO.md                     # tarefas pendentes
+└── ROADMAP.md
 ```
 
 ## Requisitos
@@ -123,15 +99,23 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
-API disponível em:
+Backend disponível em:
 
 - `http://localhost:8000/health`
-- `http://localhost:8000/docs`
-- `http://localhost:8000/graphql`
+- `http://localhost:8000/docs` — Swagger UI
+- `http://localhost:8000/graphql` — GraphiQL
+
+```bash
+# 5. Subir o frontend (em outro terminal)
+cd insonia-frontend
+python3 -m http.server 5500
+```
+
+Frontend disponível em `http://localhost:5500/ui_kits/insonia_app/`
 
 ## Variáveis de ambiente
 
-Crie um `.env` na raiz com:
+Crie um `.env` na raiz:
 
 ```env
 DATABASE_URL=postgresql+asyncpg://insonia:insonia@localhost:5432/insonia
@@ -143,47 +127,57 @@ JWT_LIFETIME_SECONDS=3600
 MAX_IMAGE_SIZE_MB=5
 ```
 
-`DEBUG` deve ser `True` ou `False`. Quando `True`, o SQLAlchemy loga todas as queries no stdout —
-nunca use `True` em produção.
+`DEBUG=True` ativa o log de queries SQL no stdout — nunca use em produção.
+
+## Criar o primeiro usuário
+
+Com o backend rodando, via Swagger (`/docs`) ou curl:
+
+```bash
+curl -X POST http://localhost:8000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email": "voce@insonia.com", "username": "voce", "password": "sua-senha"}'
+```
 
 ## Autenticação
 
-Rotas geradas automaticamente pelo `fastapi-users`:
+Todas as rotas GraphQL exigem JWT. Envie no header:
+
+```
+Authorization: Bearer <token>
+```
 
 | Método | Endpoint | Descrição |
 |--------|----------|-----------|
-| POST | `/auth/register` | Cadastro de novo usuário |
+| POST | `/auth/register` | Cadastro |
 | POST | `/auth/login` | Login — retorna JWT |
 | POST | `/auth/logout` | Logout |
+| POST | `/auth/forgot-password` | Envia e-mail de recuperação |
+| POST | `/auth/reset-password` | Redefine senha com token |
 | GET | `/users/me` | Dados do usuário logado |
 | PATCH | `/users/me` | Atualizar perfil |
-| GET | `/users/{id}` | Buscar usuário por ID |
-
-O token JWT deve ser enviado no header `Authorization: Bearer <token>` em todas as requests autenticadas,
-incluindo queries e mutations GraphQL.
 
 Os endpoints `/auth/*` têm rate limiting de 10 requisições por minuto por IP.
 
 ## GraphQL
 
-Endpoint: `POST /graphql` — interface interativa em `http://localhost:8000/graphql`
-
-Todas as operações requerem autenticação. No cliente GraphQL, adicione o header:
-```json
-{"Authorization": "Bearer <token>"}
-```
-
 ### Queries
 
 | Query | Parâmetros | Descrição |
 |-------|------------|-----------|
-| `allProducts(limit, offset)` | `limit=100`, `offset=0` | Lista produtos paginados |
+| `allProducts(limit, offset)` | `limit=100` | Lista produtos paginados |
 | `product(id)` | — | Busca produto por ID |
-| `allCategories(limit, offset)` | `limit=20`, `offset=0` | Lista categorias paginadas |
-| `allBrands(limit, offset)` | `limit=20`, `offset=0` | Lista marcas paginadas |
+| `allCategories(limit, offset)` | `limit=20` | Lista categorias |
+| `allBrands(limit, offset)` | `limit=20` | Lista marcas |
 | `brand(id)` | — | Busca marca por ID |
-| `allSales(limit, offset)` | `limit=50`, `offset=0` | Vendas do usuário autenticado, ordenadas por data desc |
+| `allSales(limit, offset, dateFrom, dateTo)` | `limit=50` | Vendas do usuário, filtráveis por data |
 | `sale(id)` | — | Busca venda por ID |
+| `allVariationNames` | — | Dimensões de variação com valores |
+| `salesSummary(dateFrom, dateTo)` | últimos 30 dias | Faturamento, lucro, contagem, ticket médio |
+| `dailyRevenue(dateFrom, dateTo)` | últimos 30 dias | Faturamento por dia (para gráfico) |
+| `topProducts(limit)` | `limit=5` | Produtos com maior volume de vendas |
+
+Datas no formato `YYYY-MM-DD`.
 
 ### Mutations
 
@@ -198,25 +192,16 @@ Todas as operações requerem autenticação. No cliente GraphQL, adicione o hea
 | `createBrand(input)` | superuser | Cria marca |
 | `updateBrand(id, input)` | superuser | Atualiza marca |
 | `deleteBrand(id)` | superuser | Remove marca |
-| `createSale(items)` | autenticado | Cria venda (decrementa estoque atomicamente) |
-| `deleteSale(id)` | dono ou superuser | Cancela venda (restaura estoque) |
+| `createVariationName(input)` | superuser | Cria dimensão de variação |
+| `addVariationValue(input)` | superuser | Adiciona valor a uma dimensão |
+| `deleteVariationName(id)` | superuser | Remove dimensão e seus valores |
+| `deleteVariationValue(id)` | superuser | Remove valor de variação |
+| `createSale(items)` | autenticado | Cria venda — decrementa estoque atomicamente |
+| `deleteSale(id)` | dono ou superuser | Cancela venda — restaura estoque |
 
 ### Exemplo rápido
 
 ```graphql
-# Criar produto (requer superuser)
-mutation {
-  createProduct(input: {
-    name: "Camiseta Preta M"
-    salePrice: 89.90
-    costPrice: 35.00
-    stock: 50
-    currency: "BRL"
-  }) {
-    id name slug salePrice { amount currency }
-  }
-}
-
 # Registrar venda
 mutation {
   createSale(items: [{ productId: 1, quantity: 2 }]) {
@@ -224,29 +209,34 @@ mutation {
   }
 }
 
-# Listar vendas com paginação
-query {
-  allSales(limit: 10, offset: 0) {
-    id saleDate totalAmount totalProfit
-    items { productId quantity }
-  }
+# Dashboard — buscar tudo em uma request
+{
+  salesSummary { totalRevenue totalProfit saleCount avgTicket }
+  dailyRevenue { date total }
+  topProducts(limit: 5) { name unitsSold revenue }
+  allSales(limit: 5) { id saleDate totalAmount }
 }
 ```
 
+## Upload de imagens
+
+```
+POST /produtos/{product_id}/images
+Content-Type: multipart/form-data
+Authorization: Bearer <token>
+```
+
+Formatos aceitos: `image/jpeg`, `image/png`, `image/webp`. Tamanho máximo: `MAX_IMAGE_SIZE_MB` (padrão 5 MB).
+
+Arquivos salvos em `media/imagens/`. Servidos em `GET /media/{filename}`.
+
 ## Serviços de negócio
 
-A camada de serviços em `app/services/` contém as regras críticas do domínio:
-
-- **`create_sale`** — busca preços do banco, decrementa estoque atomicamente via `UPDATE ... RETURNING`
-  e persiste todos os itens dentro de uma única transação. Se qualquer item falhar, a venda inteira é revertida.
-- **`remove_sale`** — cancela a venda e restaura o estoque de cada item.
-- **`decrement_stock_atomic`** — decremento atômico sem race condition: um único `UPDATE` com
-  `WHERE stock >= quantity` garante que dois pedidos simultâneos não levem o estoque a negativo.
-- **`increment_stock`** — restaura estoque ao cancelar uma venda.
+- **`create_sale`** — busca preços do banco, decrementa estoque via `UPDATE ... RETURNING` e persiste itens em transação única. Rollback total se qualquer item falhar.
+- **`remove_sale`** — cancela venda e restaura estoque de cada item.
+- **`decrement_stock_atomic`** — `UPDATE ... WHERE stock >= quantity` elimina race condition em vendas simultâneas.
 
 ## Banco de dados
-
-Tabelas criadas pelas migrations:
 
 | Tabela | Modelo |
 |--------|--------|
@@ -261,58 +251,41 @@ Tabelas criadas pelas migrations:
 | `vendas` | `Sale` |
 | `itens_venda` | `SaleItem` |
 
-Comandos úteis:
+```bash
+uv run alembic revision --autogenerate -m "descricao"  # nova migration
+uv run alembic upgrade head                             # aplicar
+uv run alembic downgrade -1                             # reverter última
+uv run alembic current                                  # estado atual
+```
+
+## Testes
 
 ```bash
-# Nova migration
-uv run alembic revision --autogenerate -m "descricao"
+# Criar banco de testes (uma vez)
+docker compose exec db psql -U insonia -c "CREATE DATABASE insonia_test;"
 
-# Aplicar
-uv run alembic upgrade head
+# Rodar todos
+uv run pytest tests/ -v
 
-# Reverter última
-uv run alembic downgrade -1
-
-# Ver estado atual
-uv run alembic current
+# Com cobertura
+uv run pytest tests/ --cov=app --cov-report=term-missing
 ```
+
+| Arquivo | Cobertura |
+|---------|-----------|
+| `test_stock.py` | `decrement_stock_atomic`, `increment_stock`, `check_stock` |
+| `test_sale_service.py` | `create_sale` (rollback em estoque insuficiente), `remove_sale` |
+| `test_graphql_mutations.py` | CRUD de produto, categoria, venda via GraphQL |
+| `test_auth.py` | Register, login, rotas protegidas, token inválido |
+| `test_e2e_pdv.py` | Fluxo completo PDV: criar → vender → cancelar → verificar estoque |
 
 ## Documentação
 
 | Arquivo | Conteúdo |
 |---------|----------|
-| [`IMPL_GUIDE.md`](./IMPL_GUIDE.md) | Passo a passo completo de implementação de cada fase |
+| [`IMPL_GUIDE.md`](./IMPL_GUIDE.md) | Guia de implementação das fases 0–9 (setup ao deploy) |
+| [`WIRING_GUIDE.md`](./WIRING_GUIDE.md) | Guia de wiring frontend ↔ backend (fases 1–8) |
+| [`TODO.md`](./TODO.md) | Tarefas pendentes com gaps de backend identificados |
 | [`ROADMAP.md`](./ROADMAP.md) | Visão geral das fases do projeto |
-| [`.planning/codebase/`](./.planning/codebase/) | Mapa do codebase (stack, arquitetura, convenções, concerns) |
-
-## Testes
-
-O banco de testes precisa existir antes de rodar a suíte:
-
-```bash
-docker compose exec db psql -U insonia -c "CREATE DATABASE insonia_test;"
-```
-
-Rodar todos os testes:
-
-```bash
-uv run pytest tests/ -v
-```
-
-| Arquivo | Cobertura |
-|---------|-----------|
-| `test_stock.py` | `check_stock_atomic`, `decrement_stock_atomic`, `increment_stock` |
-| `test_sale_service.py` | `create_sale` (rollback em estoque insuficiente), `remove_sale` |
-| `test_graphql_mutations.py` | CRUD de produto, categoria, marca e venda via GraphQL |
-| `test_auth.py` | Register, login, rotas protegidas, token inválido |
-| `test_e2e_pdv.py` | Fluxo completo PDV: criar produto → vender → cancelar → verificar estoque |
-
-**Decisões de design dos testes:**
-- `NullPool` no engine de testes — evita reutilizar conexões asyncpg entre event loops distintos (`asyncio_default_fixture_loop_scope=function` cria um event loop por teste)
-- `TRUNCATE ... RESTART IDENTITY CASCADE` após cada teste — isolamento sem custo de `drop_all`/`create_all`
-- Fixtures `user` e `auth_client` criam superuser + JWT; cada request HTTP usa sessão própria
-
-## Próximos passos
-
-1. Upload de imagens — Fase 5
-2. Conectar frontend — Fase 6
+| [`insonia-frontend/AUTH_SCREENS_SPEC.md`](./insonia-frontend/AUTH_SCREENS_SPEC.md) | Spec das telas de auth (login, recuperação, Google OAuth) |
+| [`insonia-frontend/README.md`](./insonia-frontend/README.md) | Design system — cores, tipografia, iconografia |
