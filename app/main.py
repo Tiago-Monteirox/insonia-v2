@@ -1,10 +1,13 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app.core.auth import auth_backend, fastapi_users
 from app.graphql.schema import graphql_app
 from app.routers.auth_rate_limit import AuthRateLimitMiddleware
+from app.routers.images import router as images_router
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 
@@ -17,6 +20,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Insonia v2", lifespan=lifespan)
 
 app.add_middleware(AuthRateLimitMiddleware, max_requests=10, window_seconds=60)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+    ],  # ajuste para o domínio do frontend
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
@@ -46,3 +60,5 @@ app.include_router(
     tags=["users"],
 )
 app.include_router(graphql_app, prefix="/graphql")
+app.include_router(images_router)
+app.mount("/media", StaticFiles(directory="media"), name="media")
