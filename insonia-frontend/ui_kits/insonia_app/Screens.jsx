@@ -1,6 +1,26 @@
 // Login + simple screens (Categorias, Marcas, Variações)
 function Login({ onLogin }) {
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
   React.useEffect(() => { if (window.lucide) lucide.createIcons(); });
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await insApi.login(email, password);
+      onLogin();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="login-wrap">
       <div className="login-brand">
@@ -11,16 +31,25 @@ function Login({ onLogin }) {
         <div style={{fontSize:12, color:'var(--ins-neutral-500)'}}>v1.0 · © 2026</div>
       </div>
       <div className="login-form">
-        <div className="inner">
+        <form className="inner" onSubmit={handleSubmit}>
           <div>
             <h1>Entrar</h1>
             <p>Acesse sua conta para continuar.</p>
           </div>
-          <div className="field"><label>Usuário</label><input className="input" defaultValue="tiago@insonia.com"/></div>
-          <div className="field"><label>Senha</label><input className="input" type="password" defaultValue="••••••••"/></div>
-          <button className="btn primary lg" style={{justifyContent:'center'}} onClick={onLogin}><i data-lucide="log-in"></i>Entrar</button>
+          <div className="field">
+            <label>E-mail</label>
+            <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} required autoFocus />
+          </div>
+          <div className="field">
+            <label>Senha</label>
+            <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} required />
+          </div>
+          {error && <div style={{color:'var(--ins-danger-600)', fontSize:13}}>{error}</div>}
+          <button className="btn primary lg" style={{justifyContent:'center'}} disabled={loading}>
+            <i data-lucide="log-in"></i>{loading ? 'Entrando…' : 'Entrar'}
+          </button>
           <div style={{textAlign:'center', fontSize:13, color:'var(--ins-fg-muted)'}}>Esqueceu a senha?</div>
-        </div>
+        </form>
       </div>
     </div>
   );
