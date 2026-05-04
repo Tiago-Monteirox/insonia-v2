@@ -1,11 +1,38 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ShoppingCart, X, CheckCircle2 } from 'lucide-react';
-import { produtos, categorias, fmtBRL } from '../lib/data.js';
+import { api } from '../lib/api.js';
+import { fmtBRL } from '../lib/data.js';
 
 export default function PDV() {
+  const [produtos, setProdutos] = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [cart, setCart] = useState([]);
   const [filter, setFilter] = useState(0);
   const [toast, setToast] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      api.gql(`{ allProducts(limit: 200) {
+        id name slug stock currency categoryId
+        salePrice { amount } costPrice { amount }
+      }}`),
+      api.gql(`{ allCategories { id name slug } }`),
+    ]).then(([prodData, catData]) => {
+      setProdutos(prodData.allProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        quantidade: p.stock,
+        preco_venda: p.salePrice.amount,
+        preco_custo: p.costPrice.amount,
+        letra: p.name[0].toUpperCase(),
+        categoria: p.categoryId,
+      })));
+      setCategorias(catData.allCategories);
+    }).catch(() => {
+      setToast('Erro ao carregar produtos');
+    }).finally(() => setLoading(false));
+  }, []);
 
   const filtered = filter === 0 ? produtos : produtos.filter(p => p.categoria === filter);
 
@@ -24,15 +51,39 @@ export default function PDV() {
       : i,
     ));
 
-  const finalizar = () => {
+  const finalizar = async () => {
     if (cart.length === 0) return;
-    setToast(`Venda #${235 + Math.floor(Math.random() * 5)} registrada`);
-    setCart([]);
-    setTimeout(() => setToast(null), 2500);
+    try {
+      const itemsGql = cart.map(i => `{ productId: ${i.id}, quantity: ${i.qty} }`).join(', ');
+      const data = await api.gql(`
+        mutation {
+          createSale(items: [${itemsGql}]) {
+            id totalAmount totalProfit
+          }
+        }
+      `);
+      const sale = data.createSale;
+      const cartSnapshot = cart;
+      setCart([]);
+      setProdutos(prev => prev.map(p => {
+        const item = cartSnapshot.find(i => i.id === p.id);
+        return item ? { ...p, quantidade: p.quantidade - item.qty } : p;
+      }));
+      setToast(`Venda #${sale.id} registrada — ${fmtBRL(sale.totalAmount)}`);
+    } catch (err) {
+      setToast('Erro: ' + err.message);
+    }
+    setTimeout(() => setToast(null), 3000);
   };
 
   const subtotal = cart.reduce((s, i) => s + i.preco_venda * i.qty, 0);
   const lucro = cart.reduce((s, i) => s + (i.preco_venda - i.preco_custo) * i.qty, 0);
+
+  if (loading) return (
+    <div className="content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
+      <div style={{ color: 'var(--ins-fg-muted)' }}>Carregando produtos…</div>
+    </div>
+  );
 
   return (
     <div className="content" style={{
@@ -69,6 +120,11 @@ export default function PDV() {
                 </div>
               </div>
             ))}
+            {filtered.length === 0 && (
+              <div style={{ gridColumn: '1/-1', color: 'var(--ins-fg-muted)', padding: 24, fontSize: 14 }}>
+                Nenhum produto encontrado.
+              </div>
+            )}
           </div>
         </div>
 
@@ -92,7 +148,7 @@ export default function PDV() {
               <div key={i.id} className="cart-item">
                 <div>
                   <div className="name">{i.name}</div>
-                  <div className="sub">{fmtBRL(i.preco_venda)} · {i.sku}</div>
+                  <div className="sub">{fmtBRL(i.preco_venda)}</div>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                   <div className="qty-stepper">

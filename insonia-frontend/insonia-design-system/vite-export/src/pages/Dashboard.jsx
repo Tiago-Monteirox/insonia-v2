@@ -1,18 +1,48 @@
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Calendar, Plus, TrendingUp, TrendingDown } from 'lucide-react';
-import { produtos, marcas, vendas, fmtBRL } from '../lib/data.js';
+import { Plus } from 'lucide-react';
+import { api } from '../lib/api.js';
+import { fmtBRL } from '../lib/data.js';
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [summary, setSummary] = useState(null);
+  const [chartData, setChartData] = useState([]);
+  const [topProds, setTopProds] = useState([]);
+  const [recentSales, setRecentSales] = useState([]);
+
+  useEffect(() => {
+    api.gql(`{
+      salesSummary { totalRevenue totalProfit saleCount avgTicket }
+      dailyRevenue { date total }
+      topProducts(limit: 5) { productId name unitsSold revenue }
+      allSales(limit: 5) { id saleDate totalAmount totalProfit items { id } }
+    }`).then(data => {
+      setSummary(data.salesSummary);
+      setChartData(data.dailyRevenue);
+      setTopProds(data.topProducts);
+      setRecentSales(data.allSales);
+    }).catch(() => {});
+  }, []);
+
+  function fmtData(iso) {
+    return new Date(iso).toLocaleDateString('pt-BR');
+  }
+
+  if (!summary) return (
+    <div className="content" style={{ color: 'var(--ins-fg-muted)', padding: 24 }}>
+      Carregando dashboard…
+    </div>
+  );
+
   return (
     <div className="content">
       <div className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <div className="sub">Visão geral dos últimos 30 dias</div>
+          <div className="sub">Últimos 30 dias</div>
         </div>
         <div className="row">
-          <button className="btn secondary"><Calendar size={16} />Abril 2026</button>
           <button className="btn primary" onClick={() => navigate('/pdv')}>
             <Plus size={16} />Registrar venda
           </button>
@@ -22,23 +52,19 @@ export default function Dashboard() {
       <div className="grid-4" style={{ marginBottom: 24 }}>
         <div className="stat">
           <div className="label">Faturamento</div>
-          <div className="value">R$ 24.982,40</div>
-          <div className="delta up"><TrendingUp size={14} />+12,4% vs mês anterior</div>
+          <div className="value">{fmtBRL(summary.totalRevenue)}</div>
         </div>
         <div className="stat">
           <div className="label">Lucro</div>
-          <div className="value">R$ 9.241,80</div>
-          <div className="delta up"><TrendingUp size={14} />+8,1% vs mês anterior</div>
+          <div className="value">{fmtBRL(summary.totalProfit)}</div>
         </div>
         <div className="stat">
           <div className="label">Vendas</div>
-          <div className="value">142</div>
-          <div className="delta up"><TrendingUp size={14} />+18 vendas</div>
+          <div className="value">{summary.saleCount}</div>
         </div>
         <div className="stat">
           <div className="label">Ticket médio</div>
-          <div className="value">R$ 175,90</div>
-          <div className="delta down"><TrendingDown size={14} />−2,3% vs mês anterior</div>
+          <div className="value">{fmtBRL(summary.avgTicket)}</div>
         </div>
       </div>
 
@@ -46,37 +72,31 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header">
             <h2>Faturamento diário</h2>
-            <div className="tabs" style={{ marginLeft: 'auto', margin: 0, border: 0 }}>
-              <button className="tab active" style={{ padding: '6px 12px', fontSize: 12 }}>30 dias</button>
-              <button className="tab" style={{ padding: '6px 12px', fontSize: 12 }}>7 dias</button>
-            </div>
           </div>
           <div className="card-body" style={{ height: 240, padding: 24 }}>
-            <Chart />
+            <Chart data={chartData} />
           </div>
         </div>
 
         <div className="card">
-          <div className="card-header"><h2>Produtos mais vendidos</h2></div>
+          <div className="card-header"><h2>Mais vendidos</h2></div>
           <div style={{ padding: '4px 0' }}>
-            {produtos.slice(0, 5).map((p, i) => (
-              <div key={p.id} style={{
+            {topProds.map((p, i) => (
+              <div key={p.productId} style={{
                 display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px',
-                borderBottom: i < 4 ? '1px solid var(--ins-border)' : 0,
+                borderBottom: i < topProds.length - 1 ? '1px solid var(--ins-border)' : 0,
               }}>
-                <div className="thumb-sm">{p.letra}</div>
+                <div className="thumb-sm">{p.name[0]}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 14, fontWeight: 500,
-                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--ins-fg-muted)' }}>
-                    {marcas.find(m => m.id === p.marca)?.name}
-                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--ins-fg-muted)' }}>{p.unitsSold} unidades</div>
                 </div>
-                <div className="price" style={{ fontSize: 13 }}>{fmtBRL(p.preco_venda)}</div>
+                <div className="price" style={{ fontSize: 13 }}>{fmtBRL(p.revenue)}</div>
               </div>
             ))}
+            {topProds.length === 0 && (
+              <div style={{ padding: '20px', color: 'var(--ins-fg-muted)', fontSize: 13 }}>Nenhuma venda ainda.</div>
+            )}
           </div>
         </div>
       </div>
@@ -92,22 +112,23 @@ export default function Dashboard() {
           <table className="tbl">
             <thead>
               <tr>
-                <th>#</th><th>Data</th><th>Usuário</th><th>Itens</th>
-                <th className="num">Valor</th><th className="num">Lucro</th><th>Status</th>
+                <th>#</th><th>Data</th><th>Itens</th>
+                <th className="num">Valor</th><th className="num">Lucro</th>
               </tr>
             </thead>
             <tbody>
-              {vendas.slice(0, 5).map(v => (
+              {recentSales.map(v => (
                 <tr key={v.id}>
                   <td><span className="price" style={{ color: 'var(--ins-fg-muted)' }}>#{v.id}</span></td>
-                  <td>{v.data}</td>
-                  <td>{v.usuario}</td>
-                  <td>{v.itens}</td>
-                  <td className="num">{fmtBRL(v.valor_total)}</td>
-                  <td className="num" style={{ color: 'var(--ins-success-700)' }}>{fmtBRL(v.lucro_total)}</td>
-                  <td><span className="badge success"><span className="dot"></span>{v.status}</span></td>
+                  <td>{fmtData(v.saleDate)}</td>
+                  <td>{v.items.length}</td>
+                  <td className="num">{fmtBRL(v.totalAmount)}</td>
+                  <td className="num" style={{ color: 'var(--ins-success-700)' }}>{fmtBRL(v.totalProfit)}</td>
                 </tr>
               ))}
+              {recentSales.length === 0 && (
+                <tr><td colSpan={5} style={{ color: 'var(--ins-fg-muted)', textAlign: 'center' }}>Nenhuma venda registrada.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -116,18 +137,21 @@ export default function Dashboard() {
   );
 }
 
-function Chart() {
-  const data = [42, 58, 49, 71, 63, 82, 91, 78, 104, 88, 96, 118, 102, 85, 94, 112, 128, 119, 142, 131, 148, 155, 172, 168, 185, 198, 176, 204, 211, 225];
-  const max = Math.max(...data);
+function Chart({ data }) {
+  if (!data.length) return (
+    <div style={{ color: 'var(--ins-fg-muted)', fontSize: 13 }}>Sem dados no período.</div>
+  );
+  const max = Math.max(...data.map(d => d.total));
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: '100%' }}>
-      {data.map((v, i) => (
-        <div key={i} style={{
+      {data.map((d, i) => (
+        <div key={i} title={`${d.date}: ${fmtBRL(d.total)}`} style={{
           flex: 1,
-          height: `${(v / max) * 100}%`,
+          height: `${(d.total / max) * 100}%`,
           background: i === data.length - 1 ? 'var(--ins-accent-500)' : 'var(--ins-accent-200)',
           borderRadius: '3px 3px 0 0',
           transition: 'all 200ms',
+          cursor: 'default',
         }} />
       ))}
     </div>
