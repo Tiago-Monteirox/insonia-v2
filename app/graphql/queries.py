@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 import strawberry
@@ -186,9 +186,13 @@ class Query:
         d_from = (
             date.fromisoformat(date_from)
             if date_from
-            else date.today() - timedelta(days=30)
+            else datetime.now(timezone.utc).date() - timedelta(days=30)
         )
-        d_to = date.fromisoformat(date_to) if date_to else date.today()
+        d_to = (
+            date.fromisoformat(date_to)
+            if date_to
+            else datetime.now(timezone.utc).date()
+        )
 
         result = await db.execute(
             select(
@@ -224,9 +228,13 @@ class Query:
         d_from = (
             date.fromisoformat(date_from)
             if date_from
-            else date.today() - timedelta(days=30)
+            else datetime.now(timezone.utc).date() - timedelta(days=30)
         )
-        d_to = date.fromisoformat(date_to) if date_to else date.today()
+        d_to = (
+            date.fromisoformat(date_to)
+            if date_to
+            else datetime.now(timezone.utc).date()
+        )
 
         result = await db.execute(
             select(

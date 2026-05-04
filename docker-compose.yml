@@ -4,7 +4,9 @@ services:
     environment:
       POSTGRES_DB: insonia
       POSTGRES_USER: insonia
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-insonia}
+    ports:
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
