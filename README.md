@@ -13,7 +13,8 @@ Sistema de gestão de loja e ponto de venda. Backend em FastAPI + GraphQL, front
 | Auth | fastapi-users + JWT |
 | Migrations | Alembic |
 | Gerenciador de pacotes | uv |
-| Frontend | React 18 (CDN) + Babel standalone |
+| Frontend (admin) | React 18 + Vite + React Router v6 |
+| Frontend (loja) | React 18 (CDN) + Babel standalone — UI kit estático |
 
 ## Estrutura
 
@@ -48,9 +49,9 @@ insonia-v2/
 │   │   └── stock.py            # decrement_stock_atomic, increment_stock
 │   └── main.py                 # entrypoint — rotas, middlewares, static files
 ├── insonia-frontend/
-│   ├── Insonia Design System/vite-export/   # app Vite (produção)
+│   ├── insonia-design-system/vite-export/   # admin panel — app Vite principal
 │   │   ├── src/
-│   │   │   ├── lib/api.js          # cliente GraphQL + auth
+│   │   │   ├── lib/api.js          # cliente GraphQL + auth (JWT)
 │   │   │   ├── components/         # AppLayout (Sidebar + Topbar), ProtectedRoute
 │   │   │   ├── pages/              # Dashboard, PDV, Produtos, Categorias, Marcas,
 │   │   │   │                       # Variacoes, Historico, Estatisticas
@@ -58,7 +59,8 @@ insonia-v2/
 │   │   │   └── styles/             # colors_and_type.css, app.css
 │   │   ├── .env                    # VITE_API_BASE=http://localhost:8000
 │   │   └── package.json
-│   ├── ui_kits/insonia_app/    # kit de UI (protótipo CDN, referência de design)
+│   ├── ui_kits/insonia_app/    # kit de UI do admin (CDN/Babel, referência de design)
+│   ├── ui_kits/insonia_store/  # loja e-commerce (CDN/Babel, UI kit estático)
 │   ├── colors_and_type.css     # variáveis de design system (fonte do kit)
 │   ├── AUTH_SCREENS_SPEC.md    # spec das telas de auth
 │   └── README.md               # design system — cores, tipografia, componentes
@@ -68,6 +70,8 @@ insonia-v2/
 │   ├── test_stock.py
 │   ├── test_sale_service.py
 │   ├── test_graphql_mutations.py
+│   ├── test_variations.py
+│   ├── test_aggregation_queries.py
 │   ├── test_auth.py
 │   └── test_e2e_pdv.py
 ├── alembic.ini
@@ -107,12 +111,16 @@ Backend disponível em:
 - `http://localhost:8000/graphql` — GraphiQL
 
 ```bash
-# 5. Subir o frontend Vite (em outro terminal)
-cd "insonia-frontend/Insonia Design System/vite-export"
+# 5. Subir o admin panel Vite (em outro terminal)
+cd insonia-frontend/insonia-design-system/vite-export
+npm install   # apenas na primeira vez
 npm run dev
 ```
 
-Frontend disponível em `http://localhost:5173`
+| Interface | URL | Descrição |
+|-----------|-----|-----------|
+| Admin panel | `http://localhost:5173` | Dashboard, PDV, CRUD completo — dados reais |
+| E-commerce (UI kit) | `http://localhost:5500/ui_kits/insonia_store/` | Loja estática — requer `python3 -m http.server 5500` na pasta `insonia-frontend/` |
 
 ## Variáveis de ambiente
 
@@ -276,7 +284,9 @@ uv run pytest tests/ --cov=app --cov-report=term-missing
 |---------|-----------|
 | `test_stock.py` | `decrement_stock_atomic`, `increment_stock`, `check_stock` |
 | `test_sale_service.py` | `create_sale` (rollback em estoque insuficiente), `remove_sale` |
-| `test_graphql_mutations.py` | CRUD de produto, categoria, venda via GraphQL |
+| `test_graphql_mutations.py` | CRUD de produto, categoria, marca e venda via GraphQL |
+| `test_variations.py` | CRUD de dimensões e valores de variação via GraphQL |
+| `test_aggregation_queries.py` | `salesSummary`, `dailyRevenue`, `topProducts`, filtro de data em `allSales` |
 | `test_auth.py` | Register, login, rotas protegidas, token inválido |
 | `test_e2e_pdv.py` | Fluxo completo PDV: criar → vender → cancelar → verificar estoque |
 
